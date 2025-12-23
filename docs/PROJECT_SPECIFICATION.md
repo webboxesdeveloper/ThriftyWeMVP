@@ -1,8 +1,8 @@
-# MealDeal Project Specification
+# ThrifyWe Project Specification
 
 ## Project Overview
 
-MealDeal is a web application that helps users discover affordable meals based on real-time supermarket offers. Users enter their postal code (PLZ), and the system calculates dish prices using current ingredient offers from various supermarket chains in their region.
+ThriftyWe is a web application that helps users discover affordable meals based on real-time supermarket offers. Users enter their postal code (PLZ), and the system calculates dish prices using current ingredient offers from various supermarket chains in their region.
 
 ### Technology Stack
 
@@ -360,6 +360,6 @@ For enhanced security, add server-side admin verification as described above.
 ---
 
 **Document Version:** 1.0  
-**Last Updated:** 2025-01-XX  
-**Project:** MealDeal
+**Last Updated:** 2025-12-23  
+**Project:** ThriftyWe
 

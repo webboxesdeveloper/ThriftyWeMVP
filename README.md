@@ -1,8 +1,8 @@
-# MealDeal
+# ThriftyWe
 
 **Cook Smart, Save More** - Discover delicious meals based on current supermarket deals in your area.
 
-MealDeal is a web application that helps users find and plan meals based on real-time supermarket offers. By entering your postal code (PLZ), the system calculates the best prices for dishes using current ingredient offers from various supermarket chains in your region.
+ThriftyWe is a web application that helps users find and plan meals based on real-time supermarket offers. By entering your postal code (PLZ), the system calculates the best prices for dishes using current ingredient offers from various supermarket chains in your region.
 
 ## 🎯 Business Overview
 
@@ -503,18 +503,8 @@ npm run lint         # Run ESLint
 - Check RLS policies allow user access
 - Ensure user profile exists in `user_profiles` table
 
-## 📝 License
-
-[Add your license here]
 
 ## 🤝 Contributing
 
-[Add contribution guidelines here]
+Alex
 
-## 📞 Support
-
-[Add support contact information here]
-
----
-
-**Built with ❤️ using React, TypeScript, and Supabase**
