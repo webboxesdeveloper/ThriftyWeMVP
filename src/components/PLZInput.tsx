@@ -19,7 +19,6 @@ export function PLZInput({ onPLZChange, currentPLZ }: PLZInputProps) {
     
     const trimmedPLZ = plz.trim();
     
-    // Validate German PLZ format (5 digits, range 01000-99999)
     if (trimmedPLZ.length !== 5 || !/^\d{5}$/.test(trimmedPLZ)) {
       toast.error('Please enter a valid 5-digit postal code (e.g., 10115)');
       return;
@@ -34,12 +33,9 @@ export function PLZInput({ onPLZChange, currentPLZ }: PLZInputProps) {
     setIsLoading(true);
     try {
       await onPLZChange(trimmedPLZ);
-      // Only show success if no error was thrown
       toast.success('Location updated');
     } catch (error: any) {
-      // Error message from API will be more specific (e.g., "Postal code not found")
       toast.error(error?.message || 'Failed to update location. Please check your postal code.');
-      // Don't show success message if there was an error
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +53,6 @@ export function PLZInput({ onPLZChange, currentPLZ }: PLZInputProps) {
             placeholder="Enter PLZ (e.g., 10115)"
             value={plz}
             onChange={(e) => {
-              // Only allow digits, max 5 characters
               const value = e.target.value.replace(/\D/g, '').slice(0, 5);
               setPLZ(value);
             }}

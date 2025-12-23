@@ -41,12 +41,10 @@ export default function DishDetail() {
     }
   }, [dishId, userId]);
 
-  // Load chain information from URL params
   useEffect(() => {
     const chainName = searchParams.get('chain');
     if (chainName && chainName !== 'all') {
       setSelectedChainName(chainName);
-      // Get chain_id from chain_name
       api.getChainByName(chainName).then((chain) => {
         if (chain) {
           setSelectedChainId(chain.chain_id);

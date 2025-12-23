@@ -26,14 +26,12 @@ export default function Login() {
     setIsLoading(true);
     try {
       if (isSignUp) {
-        // Validate email format
         if (!email || !email.includes('@')) {
           toast.error('Please enter a valid email address.');
           setIsLoading(false);
           return;
         }
 
-        // Check if email already exists
         const emailExists = await api.checkEmailExists(email);
         if (emailExists) {
           toast.error('This email address is already registered. Please sign in instead or use a different email address.');
@@ -41,7 +39,6 @@ export default function Login() {
           return;
         }
 
-        // Check if username already exists (if provided)
         if (username && username.trim()) {
           const usernameExists = await api.checkUsernameExists(username.trim());
           if (usernameExists) {
@@ -85,7 +82,6 @@ export default function Login() {
         return;
       }
       
-      // Get the role from user_roles table
       const { data: roles, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
@@ -108,7 +104,6 @@ export default function Login() {
         navigate('/');
       }
     } catch (error: any) {
-      // Error messages are already user-friendly from useAuth
       toast.error(error.message || 'An error occurred. Please try again.');
     } finally {
       setIsLoading(false);

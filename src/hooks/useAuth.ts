@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useAuth = () => {
-  const [userId, setUserId] = useState<string | null>(null); // profile id
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ username?: string; email?: string } | null>(null);
@@ -12,10 +12,9 @@ export const useAuth = () => {
   useEffect(() => {
     let isMounted = true;
     let subscription: { unsubscribe: () => void } | null = null;
-    let initialSessionLoaded = false; // Flag to track if initial session restoration is complete
+    let initialSessionLoaded = false;
 
     const init = async () => {
-      // Set a timeout to ensure loading doesn't hang forever
       const timeoutId = setTimeout(() => {
         if (isMounted) {
           setLoading(false);
@@ -23,12 +22,8 @@ export const useAuth = () => {
       }, 10000);
 
       try {
-        // STEP 1: Read session from sessionStorage FIRST (Best Practice)
-        // This restores the session before any listeners can interfere
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
         
-        // STEP 2: Validate session with getUser() (Best Practice - keep this)
-        // This ensures the token is still valid and not revoked
         if (currentSession) {
           try {
             const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -47,7 +42,6 @@ export const useAuth = () => {
 
         const session = currentSession;
 
-        // STEP 3: Restore session state
         if (session?.user && isMounted) {
           currentAuthUserIdRef.current = session.user.id;
           try {
@@ -63,27 +57,20 @@ export const useAuth = () => {
             }
           }
         } else if (isMounted) {
-          // No session found in storage
           setUserId(null);
           setRole(null);
           setUserProfile(null);
         }
 
-        // Mark initial session load as complete
         initialSessionLoaded = true;
 
-        // STEP 4: NOW register onAuthStateChange listener AFTER session is restored
-        // This prevents the listener from firing with null before session is loaded
         const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!isMounted) return;
 
-          // Ignore initial null events if we just loaded a session
-          // Only process events after initial session restoration
           if (!initialSessionLoaded && !session) {
-            return; // Ignore initial null event
+            return;
           }
 
-          // Only sync if the user ID actually changed or if we haven't synced yet
           const newAuthUserId = session?.user?.id || null;
           const authUserIdChanged = newAuthUserId !== currentAuthUserIdRef.current;
           const needsSync = authUserIdChanged || (newAuthUserId && !hasSyncedRef.current);
@@ -115,7 +102,6 @@ export const useAuth = () => {
               }
             }
           } else {
-            // No session -> clear state (only after initial load)
             if (initialSessionLoaded) {
               currentAuthUserIdRef.current = null;
               hasSyncedRef.current = false;
@@ -159,7 +145,6 @@ export const useAuth = () => {
       }
     };
 
-    // Start initialization
     init();
 
     return () => {
@@ -172,7 +157,6 @@ export const useAuth = () => {
 
   const syncProfileAndRole = async (authUserId: string) => {
     try {
-      // Ensure a user_profiles row exists with id = auth user id
       const { data: profile, error: selErr } = await supabase
         .from('user_profiles')
         .select('id, plz, username, email')
@@ -210,7 +194,6 @@ export const useAuth = () => {
         });
       }
 
-      // Get roles for the profile
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
         .select('role')
@@ -222,7 +205,6 @@ export const useAuth = () => {
       }
 
       if (roles && roles.length > 0) {
-        // Prefer admin if present
         const hasAdmin = roles.find((r: any) => r.role === 'admin');
         setRole(hasAdmin ? 'admin' : roles[0].role);
       } else {
@@ -237,12 +219,9 @@ export const useAuth = () => {
   };
 
   const signIn = async (email: string, password: string) => {
-    // Sign in with credentials
-    // Supabase will handle clearing any existing session automatically
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
 
-    // After successful sign in, sync profile
     const authUser = (await supabase.auth.getUser()).data.user;
     if (authUser) {
       await syncProfileAndRole(authUser.id);
@@ -250,8 +229,6 @@ export const useAuth = () => {
   };
 
   const signUp = async (email: string, password: string, username?: string, plz?: string) => {
-    // Use Supabase signUp with metadata to pass username and PLZ
-    // The trigger will automatically create the profile with this metadata
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
@@ -263,11 +240,9 @@ export const useAuth = () => {
       }
     });
     
-    // Handle Supabase auth errors with user-friendly messages
     if (error) {
       const errorMsg = error.message?.toLowerCase() || '';
       
-      // Email already exists
       if (errorMsg.includes('already registered') || 
           errorMsg.includes('already exists') || 
           errorMsg.includes('user already registered') ||
@@ -275,44 +250,29 @@ export const useAuth = () => {
         throw new Error('This email address is already registered. Please sign in instead or use a different email address.');
       }
       
-      // Invalid email format
       if (errorMsg.includes('invalid email') || errorMsg.includes('email format')) {
         throw new Error('Please enter a valid email address (e.g., yourname@example.com).');
       }
       
-      // Password too short
       if (errorMsg.includes('password') && (errorMsg.includes('short') || errorMsg.includes('length'))) {
         throw new Error('Password must be at least 6 characters long. Please choose a stronger password.');
       }
       
-      // Weak password
       if (errorMsg.includes('weak password') || errorMsg.includes('password is too weak')) {
         throw new Error('Password is too weak. Please choose a stronger password with at least 6 characters.');
       }
       
-      // Generic error with helpful message
       throw new Error(error.message || 'Failed to create account. Please check your information and try again.');
     }
 
-    // The trigger handle_new_user() will automatically:
-    // 1. Create user_profiles row with email, username, and PLZ from metadata
-    // 2. Create user_roles row with 'user' role
-    // No need to manually create/update profile - trigger handles it all
-
-    // If a user object is returned (auto-confirmed), sync local state
     const createdUser = data?.user;
     if (createdUser) {
-      // Wait a moment for trigger to complete
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Sync local state (profile should already exist from trigger)
       try {
         await syncProfileAndRole(createdUser.id);
       } catch (err) {
       }
-    } else {
-      // Email confirmation required - profile will be created when user confirms email
-      // The trigger will handle profile creation automatically with metadata
     }
 
     return data;

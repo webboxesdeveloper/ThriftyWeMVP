@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 
-// Types
 export interface Dish {
   dish_id: string;
   name: string;

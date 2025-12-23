@@ -12,8 +12,7 @@ interface DishCardProps {
     category: string;
     is_quick?: boolean;
     is_meal_prep?: boolean;
-    // Removed: currentPrice, basePrice (no total price per dish)
-    totalAggregatedSavings?: number; // Sum of per-unit savings
+    totalAggregatedSavings?: number;
     savingsPercent?: number;
     availableOffers?: number;
     ingredientsWithOffers?: number;
@@ -30,7 +29,6 @@ export function DishCard({ dish, onFavorite }: DishCardProps) {
   const hasSavings = dish.totalAggregatedSavings && dish.totalAggregatedSavings > 0;
 
   const handleCardClick = () => {
-    // Preserve query params when navigating to dish detail
     navigate(`/dish/${dish.dish_id}${location.search}`);
   };
 

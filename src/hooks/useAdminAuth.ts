@@ -27,7 +27,6 @@ export const useAdminAuth = () => {
       async (event, session) => {
         if (!isMounted) return;
 
-        // Only check if the user ID actually changed or if we haven't checked yet
         const newAuthUserId = session?.user?.id || null;
         const authUserIdChanged = newAuthUserId !== currentAuthUserIdRef.current;
         const needsCheck = authUserIdChanged || (newAuthUserId && !hasCheckedRef.current);
@@ -35,7 +34,6 @@ export const useAdminAuth = () => {
         if (session?.user) {
           currentAuthUserIdRef.current = session.user.id;
           
-          // Only set loading and check if we actually need to
           if (needsCheck) {
             setLoading(true);
             try {
@@ -53,7 +51,6 @@ export const useAdminAuth = () => {
             }
           }
         } else {
-          // No session -> clear state
           currentAuthUserIdRef.current = null;
           hasCheckedRef.current = false;
           if (isMounted) {
@@ -89,7 +86,6 @@ export const useAdminAuth = () => {
 
   const checkAdminRole = async (authUserId: string) => {
     try {
-      // Get user profile
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('id')
@@ -104,7 +100,6 @@ export const useAdminAuth = () => {
 
       setUserId(profile.id);
 
-      // Check admin role
       const { data: roles } = await supabase
         .from('user_roles')
         .select('role')

@@ -39,7 +39,6 @@ export default function Index() {
   const [categories, setCategories] = useState<string[]>([]);
   const [chains, setChains] = useState<string[]>([]);
   
-  // Initialize state from URL params or defaults
   const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get('category') || 'all');
   const [selectedChain, setSelectedChain] = useState(() => searchParams.get('chain') || 'all');
   const [maxPrice, setMaxPrice] = useState(() => parseInt(searchParams.get('maxPrice') || '30', 10));
@@ -52,11 +51,9 @@ export default function Index() {
   const [viewMode, setViewMode] = useState<'all' | 'favorites'>(() => (searchParams.get('view') as 'all' | 'favorites') || 'all');
   const [favoriteDishIds, setFavoriteDishIds] = useState<string[]>([]);
   
-  // Pagination state
   const itemsPerPage = 12;
   const [currentPage, setCurrentPage] = useState(() => parseInt(searchParams.get('page') || '1', 10));
 
-  // Function to update URL params based on current filter/sort state
   const updateURLParams = (updates: {
     category?: string;
     chain?: string;
@@ -183,7 +180,6 @@ export default function Index() {
       setCategories(categoriesData);
       setChains(chainsData.map((c) => c.chain_name));
       
-      // If selected chain is no longer available after PLZ change, reset it
       if (selectedChain !== 'all' && chainsData.length > 0) {
         const chainNames = chainsData.map((c) => c.chain_name);
         if (!chainNames.includes(selectedChain)) {
@@ -219,7 +215,6 @@ export default function Index() {
 
       let dishesData = await api.getDishes(filters, 10000); 
 
-      // Load favorites for user
       const favorites = await api.getFavorites(userId);
       setFavoriteDishIds(favorites);
 
@@ -250,11 +245,10 @@ export default function Index() {
     }
   };
 
-  const sortDishes = (dishes: Dish[], sort: typeof sortBy, direction: 'asc' | 'desc'): Dish[] => {
+      const sortDishes = (dishes: Dish[], sort: typeof sortBy, direction: 'asc' | 'desc'): Dish[] => {
     const sorted = [...dishes];
     switch (sort) {
       case 'savings':
-        // Sort by totalAggregatedSavings
         if (direction === 'desc') {
           return sorted.sort((a, b) => (b.totalAggregatedSavings || 0) - (a.totalAggregatedSavings || 0));
         } else {
@@ -272,17 +266,14 @@ export default function Index() {
   };
 
   const handleSortChange = (value: typeof sortBy) => {
-    // When changing sort type, set appropriate default direction
     const newDirection = value === 'savings' ? 'desc' : 'asc';
     setSortBy(value);
     setSortDirection(newDirection);
     updateURLParams({ sortBy: value, sortDir: newDirection });
-    // Re-sort existing dishes immediately
     setDishes((currentDishes) => sortDishes([...currentDishes], value, newDirection));
   };
 
   const handleSortDirectionToggle = () => {
-    // Toggle sort direction and re-sort existing dishes immediately
     const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
     setSortDirection(newDirection);
     updateURLParams({ sortDir: newDirection });
@@ -292,10 +283,8 @@ export default function Index() {
   const handlePLZChange = async (plz: string) => {
     if (!userId) return;
 
-    // Validate PLZ exists before updating
     const isValid = await api.validatePLZ(plz);
     if (!isValid) {
-      // Throw error so PLZInput can catch it and not show success message
       throw new Error('Postal code not found. Please enter a valid postal code that exists in our database.');
     }
 
@@ -331,7 +320,6 @@ export default function Index() {
         )
       );
       
-      // Update favoriteDishIds for badge count
       setFavoriteDishIds((prev) => {
         if (isFavorite) {
           return prev.filter((id) => id !== dishId);
@@ -597,7 +585,6 @@ export default function Index() {
                         </PaginationItem>
                         
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                          // Show first page, last page, current page, and pages around current
                           if (
                             page === 1 ||
                             page === totalPages ||
@@ -684,7 +671,6 @@ export default function Index() {
                         </PaginationItem>
                         
                         {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                          // Show first page, last page, current page, and pages around current
                           if (
                             page === 1 ||
                             page === totalPages ||

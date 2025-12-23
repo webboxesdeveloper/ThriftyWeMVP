@@ -7,14 +7,11 @@ export default function Privacy() {
   const location = useLocation();
   
   const handleBack = () => {
-    // Get saved search params from location state
     const returnSearch = (location.state as { returnSearch?: string })?.returnSearch;
     
     if (returnSearch) {
-      // Restore the saved query parameters
       navigate(`/${returnSearch ? `?${returnSearch}` : ''}`);
     } else {
-      // Try to use browser history
       navigate(-1);
     }
   };

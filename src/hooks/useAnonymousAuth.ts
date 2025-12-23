@@ -10,11 +10,9 @@ export const useAnonymousAuth = () => {
   useEffect(() => {
     const initAnonymousUser = async () => {
       try {
-        // Check localStorage first
         let storedUserId = localStorage.getItem(ANONYMOUS_USER_KEY);
 
         if (!storedUserId) {
-          // Create new anonymous user profile
           const { data, error } = await supabase
             .from('user_profiles')
             .insert({})
@@ -26,14 +24,12 @@ export const useAnonymousAuth = () => {
           storedUserId = data.id;
           localStorage.setItem(ANONYMOUS_USER_KEY, storedUserId);
         } else {
-          // Verify user exists and update last_seen
           const { error } = await supabase
             .from('user_profiles')
             .update({ last_seen: new Date().toISOString() })
             .eq('id', storedUserId);
 
           if (error) {
-            // User doesn't exist, create new one
             const { data, error: createError } = await supabase
               .from('user_profiles')
               .insert({})

@@ -1,6 +1,3 @@
-// Supabase Edge Function for CSV Import
-// Handles CSV file uploads, validation, and database insertion
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -15,9 +12,7 @@ interface CSVImportResult {
   imported?: number;
 }
 
-// Generate hash for offer deduplication
 function generateOfferHash(row: Record<string, any>): string {
-  // Handle null/undefined values by converting to empty string
   const hashData = [
     row.region_id || '',
     row.ingredient_id || '',
@@ -28,7 +23,6 @@ function generateOfferHash(row: Record<string, any>): string {
     row.source_ref_id || '',
   ].join('|');
   
-  // Simple hash function
   let hash = 0;
   for (let i = 0; i < hashData.length; i++) {
     const char = hashData.charCodeAt(i);
@@ -38,7 +32,6 @@ function generateOfferHash(row: Record<string, any>): string {
   return hash.toString(36);
 }
 
-// Parse CSV content
 function parseCSV(content: string): string[][] {
   const lines: string[][] = [];
   let currentLine: string[] = [];
@@ -73,7 +66,6 @@ function parseCSV(content: string): string[][] {
     }
   }
 
-  // Add last line
   if (currentField || currentLine.length > 0) {
     currentLine.push(currentField.trim());
     lines.push(currentLine);
@@ -82,7 +74,6 @@ function parseCSV(content: string): string[][] {
   return lines.filter(line => line.length > 0);
 }
 
-// Get expected columns for each table type (excluding auto-generated columns)
 function getExpectedColumns(tableType: string): string[] {
   const expectedColumns: Record<string, string[]> = {
     'ad_regions': ['region_id', 'chain_id', 'label'],
@@ -101,7 +92,6 @@ function getExpectedColumns(tableType: string): string[] {
   return expectedColumns[tableType] || [];
 }
 
-// Get required fields for each table type
 function getRequiredFields(tableType: string): Set<string> {
   const requiredFields: Record<string, string[]> = {
     'ad_regions': ['region_id', 'chain_id', 'label'],
@@ -118,7 +108,6 @@ function getRequiredFields(tableType: string): Set<string> {
   return new Set(requiredFields[tableType] || []);
 }
 
-// Check if a value is empty (null, empty string, whitespace, or 'NULL'/'null' strings)
 function isEmptyValue(value: string): boolean {
   if (!value) return true;
   const trimmed = value.trim();
@@ -128,7 +117,6 @@ function isEmptyValue(value: string): boolean {
          trimmed.length === 0;
 }
 
-// Validate and transform row based on table type
 function validateRow(
   headers: string[],
   row: string[],

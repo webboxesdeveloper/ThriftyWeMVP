@@ -28,16 +28,15 @@ export class CookieStorage implements Storage {
   }) {
     this.cookiePrefix = cookiePrefix;
     this.cookieOptions = {
-      expires: cookieOptions?.expires || 365, // Default: 1 year
+      expires: cookieOptions?.expires || 365,
       path: cookieOptions?.path || '/',
-      secure: cookieOptions?.secure ?? (window.location.protocol === 'https:'), // Secure in production
-      sameSite: cookieOptions?.sameSite || 'lax', // CSRF protection
+      secure: cookieOptions?.secure ?? (window.location.protocol === 'https:'),
+      sameSite: cookieOptions?.sameSite || 'lax',
       ...cookieOptions,
     };
   }
 
   get length(): number {
-    // Count cookies that match our prefix, plus sessionStorage items
     let count = 0;
     const allCookies = document.cookie.split(';');
     const seenKeys = new Set<string>();
@@ -46,7 +45,6 @@ export class CookieStorage implements Storage {
       const trimmed = cookie.trim();
       if (trimmed.startsWith(this.cookiePrefix)) {
         const key = trimmed.split('=')[0].trim();
-        // Don't count storage markers
         if (!key.endsWith('_storage')) {
           seenKeys.add(key);
           count++;
@@ -54,7 +52,6 @@ export class CookieStorage implements Storage {
       }
     }
     
-    // Also count sessionStorage items that match prefix
     try {
       for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
@@ -63,7 +60,6 @@ export class CookieStorage implements Storage {
         }
       }
     } catch {
-      // Ignore sessionStorage errors
     }
     
     return count;
@@ -87,44 +83,36 @@ export class CookieStorage implements Storage {
 
   getItem(key: string): string | null {
     try {
-      // First try to get from cookie
       const cookieValue = Cookies.get(key);
       if (cookieValue) {
         return cookieValue;
       }
       
-      // Check if there's a storage marker indicating value is elsewhere
       const storageMarker = Cookies.get(`${key}_storage`);
       
       if (storageMarker === 's') {
-        // Value is in sessionStorage
         try {
           const sessionValue = sessionStorage.getItem(key);
           if (sessionValue) {
             return sessionValue;
           }
         } catch {
-          // Ignore sessionStorage errors
         }
       } else if (storageMarker === 'l') {
-        // Value is in localStorage (fallback)
         try {
           const localValue = localStorage.getItem(key);
           if (localValue) {
             return localValue;
           }
         } catch {
-          // Ignore localStorage errors
         }
       } else {
-        // No marker, but check sessionStorage anyway (for backwards compatibility)
         try {
           const sessionValue = sessionStorage.getItem(key);
           if (sessionValue) {
             return sessionValue;
           }
         } catch {
-          // Ignore sessionStorage errors
         }
       }
       
@@ -136,19 +124,11 @@ export class CookieStorage implements Storage {
 
   setItem(key: string, value: string): void {
     try {
-      // Cookies have a 4KB limit per cookie
-      // Supabase tokens can be large (especially the main auth token)
-      // Strategy: Try cookie first, fall back to sessionStorage if too large
-      
-      const MAX_COOKIE_SIZE = 4000; // Leave some buffer (4KB = 4096 bytes)
+      const MAX_COOKIE_SIZE = 4000;
       
       if (value.length > MAX_COOKIE_SIZE) {
-        // Value is too large for cookie, use sessionStorage
-        // This ensures session persists across page reloads
         try {
           sessionStorage.setItem(key, value);
-          // Store a marker in cookie to indicate where the value is
-          // Use single char 's' to save space
           try {
             Cookies.set(`${key}_storage`, 's', { 
               ...this.cookieOptions,
@@ -171,10 +151,8 @@ export class CookieStorage implements Storage {
           }
         }
       } else {
-        // Value fits in cookie, store it there
         try {
           Cookies.set(key, value, this.cookieOptions);
-          // Remove any fallback storage markers and data
           try {
             Cookies.remove(`${key}_storage`, { path: this.cookieOptions.path });
             sessionStorage.removeItem(key);
@@ -189,7 +167,6 @@ export class CookieStorage implements Storage {
               expires: 365
             });
           } catch {
-            // Ignore marker errors
           }
         }
       }
@@ -201,7 +178,6 @@ export class CookieStorage implements Storage {
     try {
       Cookies.remove(key, { path: this.cookieOptions.path });
       Cookies.remove(`${key}_storage`, { path: this.cookieOptions.path });
-      // Also try to remove from sessionStorage and localStorage
       try {
         sessionStorage.removeItem(key);
         localStorage.removeItem(key);
@@ -213,7 +189,6 @@ export class CookieStorage implements Storage {
 
   clear(): void {
     try {
-      // Remove all cookies that match our prefix
       const allCookies = document.cookie.split(';');
       for (const cookie of allCookies) {
         const trimmed = cookie.trim();

@@ -12,7 +12,6 @@ export const RequireAuth: React.FC<{ children: React.ReactElement, adminOnly?: b
   }
 
   if (adminOnly && role !== 'admin') {
-    // If user is not admin, redirect to home
     return <Navigate to="/" replace />;
   }
 
