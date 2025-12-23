@@ -130,7 +130,6 @@ export class CookieStorage implements Storage {
       
       return null;
     } catch (error) {
-      console.error('Error reading storage:', error);
       return null;
     }
   }
@@ -156,11 +155,8 @@ export class CookieStorage implements Storage {
               expires: 365 // Same expiry as main token
             });
           } catch {
-            // If we can't set marker, that's okay - we'll check sessionStorage anyway
           }
         } catch (fallbackError) {
-          console.error('Error setting fallback storage:', fallbackError);
-          // Last resort: try localStorage (but this defeats the purpose of using cookies)
           try {
             localStorage.setItem(key, value);
             try {
@@ -169,11 +165,9 @@ export class CookieStorage implements Storage {
                 expires: 365
               });
             } catch {
-              // Ignore marker errors
             }
           } catch (localError) {
-            console.error('Error setting localStorage fallback:', localError);
-            throw localError; // Re-throw if all storage methods fail
+            throw localError;
           }
         }
       } else {
@@ -186,11 +180,8 @@ export class CookieStorage implements Storage {
             sessionStorage.removeItem(key);
             localStorage.removeItem(key);
           } catch {
-            // Ignore cleanup errors
           }
         } catch (cookieError) {
-          // If cookie setting fails (e.g., secure flag in HTTP), fall back
-          console.warn('Cookie set failed, using sessionStorage fallback:', cookieError);
           sessionStorage.setItem(key, value);
           try {
             Cookies.set(`${key}_storage`, 's', { 
@@ -203,8 +194,6 @@ export class CookieStorage implements Storage {
         }
       }
     } catch (error) {
-      console.error('Error setting storage:', error);
-      // Don't throw - let Supabase handle the error
     }
   }
 
@@ -217,10 +206,8 @@ export class CookieStorage implements Storage {
         sessionStorage.removeItem(key);
         localStorage.removeItem(key);
       } catch {
-        // Ignore errors
       }
     } catch (error) {
-      console.error('Error removing cookie:', error);
     }
   }
 
@@ -236,7 +223,6 @@ export class CookieStorage implements Storage {
         }
       }
     } catch (error) {
-      console.error('Error clearing cookies:', error);
     }
   }
 }

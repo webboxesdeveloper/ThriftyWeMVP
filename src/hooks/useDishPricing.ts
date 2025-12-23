@@ -15,7 +15,6 @@ export const useDishPricing = (dishId: string | undefined, userPlz: string | nul
         const result = await api.getDishPricing(dishId, userPlz || undefined);
         setPricing(result);
       } catch (error) {
-        console.error('Error fetching dish pricing:', error);
       } finally {
         setLoading(false);
       }

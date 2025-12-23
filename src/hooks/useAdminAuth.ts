@@ -18,7 +18,6 @@ export const useAdminAuth = () => {
         await checkAdminStatus();
         hasCheckedRef.current = true;
       } catch (error) {
-        console.error('Error in initial admin check:', error);
       }
     };
 
@@ -43,7 +42,6 @@ export const useAdminAuth = () => {
               await checkAdminRole(session.user.id);
               hasCheckedRef.current = true;
             } catch (error) {
-              console.error('Error in admin auth state change:', error);
               if (isMounted) {
                 setIsAdmin(false);
                 setUserId(null);
@@ -84,7 +82,6 @@ export const useAdminAuth = () => {
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error checking admin status:', error);
       setIsAdmin(false);
       setLoading(false);
     }
@@ -116,7 +113,6 @@ export const useAdminAuth = () => {
 
       setIsAdmin(roles && roles.length > 0);
     } catch (error) {
-      console.error('Error checking admin role:', error);
       setIsAdmin(false);
     } finally {
       setLoading(false);

@@ -10,7 +10,6 @@ import { api } from '@/services/api';
 import { CSVImportErrors } from './CSVImportErrors';
 
 const CSV_TYPES = {
-  // Import order matters - follow this sequence
   lookups_categories: 'Categories (Lookup)',
   lookups_units: 'Units (Lookup)',
   chains: 'Chains',
@@ -52,7 +51,6 @@ export function CSVImport() {
     try {
       const result = await api.importCSV(file, selectedType, dryRun);
 
-      // Store result for display
       setImportResult(result);
 
       if (dryRun) {
@@ -74,15 +72,12 @@ export function CSVImport() {
           toast.warning(`Import completed but count unavailable. ${result.validRows} rows were validated.`);
         } else {
           toast.success(`Import complete: ${result.imported} rows imported successfully`);
-          // Clear form on successful import
           setFile(null);
           setSelectedType('');
           setImportResult(null);
         }
       }
     } catch (error: any) {
-      console.error('Import error:', error);
-      // Show user-friendly error
       const errorMessage = error.message || 'Import failed';
       setImportResult({
         validRows: 0,

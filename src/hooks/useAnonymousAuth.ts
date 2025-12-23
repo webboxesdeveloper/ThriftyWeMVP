@@ -49,7 +49,6 @@ export const useAnonymousAuth = () => {
 
         setUserId(storedUserId);
       } catch (error) {
-        console.error('Error initializing anonymous user:', error);
       } finally {
         setLoading(false);
       }
@@ -67,7 +66,6 @@ export const useAnonymousAuth = () => {
       .eq('id', userId);
 
     if (error) {
-      console.error('Error updating PLZ:', error);
       throw error;
     }
   };

@@ -72,7 +72,6 @@ export default function DishDetail() {
         setUserPLZ(plz);
       }
     } catch (error) {
-      console.error('Error loading user PLZ:', error);
     }
   };
 
@@ -99,7 +98,6 @@ export default function DishDetail() {
       setPricing(pricingData);
       setIsFavorite(favorites.includes(dishId));
     } catch (error: any) {
-      console.error('Error loading dish data:', error);
       toast.error(error?.message || 'Failed to load dish details');
     } finally {
       setLoading(false);
@@ -120,7 +118,6 @@ export default function DishDetail() {
         toast.success('Added to favorites');
       }
     } catch (error: any) {
-      console.error('Error toggling favorite:', error);
       toast.error(error?.message || 'Failed to update favorite');
     }
   };
@@ -151,7 +148,6 @@ export default function DishDetail() {
   const requiredIngredients = ingredients.filter((ing) => !ing.optional);
   const optionalIngredients = ingredients.filter((ing) => ing.optional);
 
-  // Calculate total aggregated savings (sum of per-unit savings)
   const totalAggregatedSavings = pricing?.total_aggregated_savings ?? 0;
 
   return (
@@ -176,7 +172,6 @@ export default function DishDetail() {
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Selected Chain Display */}
         {selectedChainName && (
           <Card className="mb-4 border-primary/20 bg-primary/5">
             <CardContent className="pt-6">
@@ -191,7 +186,6 @@ export default function DishDetail() {
           </Card>
         )}
 
-        {/* Dish Header */}
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-start justify-between gap-4">
@@ -238,7 +232,6 @@ export default function DishDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Aggregated Savings Summary */}
             <div className="space-y-4">
               {totalAggregatedSavings > 0 && (
                 <div className="flex items-center gap-2">
@@ -276,7 +269,6 @@ export default function DishDetail() {
                 </p>
               )}
 
-              {/* Important Notice */}
               <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mt-4">
                 <p className="text-sm text-blue-900 dark:text-blue-100">
                   <strong>Hinweis:</strong>: Die angezeigten Basispreise sind Einheitspreise (z. B. €/kg, €/l, €/Stück) für reguläre Markenprodukte. Eigenmarken oder Sonderangebote sind nicht berücksichtigt. Tatsächliche Preise können je nach Produkt und Packung variieren.
@@ -297,7 +289,6 @@ export default function DishDetail() {
           </CardContent>
         </Card>
 
-        {/* Ingredients List */}
         <Card>
           <CardHeader>
             <CardTitle>Ingredients</CardTitle>
@@ -308,7 +299,6 @@ export default function DishDetail() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {/* Main Ingredients */}
               {requiredIngredients.length > 0 && (
                 <div>
                   <h3 className="font-semibold mb-3 text-lg">Main</h3>
@@ -338,7 +328,6 @@ export default function DishDetail() {
                               </div>
                             </div>
                             <div className="text-right">
-                              {/* Per-unit pricing display (from ingredients table) */}
                               {ing.has_offer && ing.price_baseline_per_unit !== undefined && ing.unit_default && (
                                 <div className="space-y-1">
                                   <div className="text-sm text-muted-foreground">
@@ -367,7 +356,6 @@ export default function DishDetail() {
                             </div>
                           </div>
                           
-                          {/* Enhanced offer details - show ALL available offers */}
                           {ing.has_offer && ing.all_offers && ing.all_offers.length > 0 && (
                             <div className="pt-2 border-t space-y-2">
                               <div className="text-xs font-semibold text-muted-foreground mb-2">
@@ -388,11 +376,6 @@ export default function DishDetail() {
                                       <div className="flex items-start justify-between gap-2 mb-1.5">
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2 flex-wrap">
-                                            {/* {isLowestPrice && (
-                                              <Badge variant="outline" className="text-xs bg-green-600 text-white border-green-600">
-                                                Best Price
-                                              </Badge>
-                                            )} */}
                                             {offer.chain_name && (
                                               <span className="font-medium text-foreground">
                                                 {offer.chain_name}
@@ -435,15 +418,9 @@ export default function DishDetail() {
                                   );
                                 })}
                               </div>
-                              {/* {ing.all_offers.length > 1 && (
-                                <div className="text-xs text-muted-foreground italic pt-1">
-                                  Note: The lowest price offer (marked "Best Price") is used for savings calculation.
-                                </div>
-                              )} */}
                             </div>
                           )}
                           
-                          {/* Fallback: Show single offer details if all_offers is not available (backwards compatibility) */}
                           {ing.has_offer && (!ing.all_offers || ing.all_offers.length === 0) && (
                             <div className="pt-2 border-t space-y-1.5 text-xs">
                               {ing.offer_source && (
@@ -475,8 +452,6 @@ export default function DishDetail() {
                               </div>
                             </div>
                           )}
-                          
-                          {/* No additional price info when no offer - already shown as "No Offer" above */}
                         </div>
                       );
                     })}
@@ -516,7 +491,6 @@ export default function DishDetail() {
                                 </div>
                               </div>
                               <div className="text-right">
-                                {/* Per-unit pricing display (from ingredients table) */}
                                 {ing.has_offer && ing.price_baseline_per_unit !== undefined && ing.unit_default && (
                                   <div className="space-y-1">
                                     <div className="text-sm text-muted-foreground">
@@ -545,7 +519,6 @@ export default function DishDetail() {
                               </div>
                             </div>
                             
-                            {/* Show all offers for optional ingredients too */}
                             {ing.has_offer && ing.all_offers && ing.all_offers.length > 0 && (
                               <div className="pt-2 border-t space-y-2">
                                 <div className="text-xs font-semibold text-muted-foreground mb-2">
@@ -566,11 +539,6 @@ export default function DishDetail() {
                                         <div className="flex items-start justify-between gap-2 mb-1.5">
                                           <div className="flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                              {/* {isLowestPrice && (
-                                                <Badge variant="outline" className="text-xs bg-green-600 text-white border-green-600">
-                                                  Best Price
-                                                </Badge>
-                                              )} */}
                                               {offer.source && (
                                                 <span className="font-medium text-foreground">
                                                   {offer.source}
@@ -608,15 +576,8 @@ export default function DishDetail() {
                                     );
                                   })}
                                 </div>
-                                {/* {ing.all_offers.length > 1 && (
-                                  <div className="text-xs text-muted-foreground italic pt-1">
-                                    Note: The lowest price offer (marked "Best Price") is used for savings calculation.
-                                  </div>
-                                )} */}
                               </div>
                             )}  
-
-                            {/* No additional price info when no offer - already shown as "No Offer" above */}
                           </div>
                         );
                       })}

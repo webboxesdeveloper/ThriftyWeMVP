@@ -38,7 +38,7 @@ export function DataTable() {
 
   useEffect(() => {
     if (selectedTable) {
-      setCurrentPage(1); // Reset to page 1 when table changes - this will trigger the fetch in the next useEffect
+      setCurrentPage(1);
     }
   }, [selectedTable]);
 
@@ -65,7 +65,6 @@ export function DataTable() {
         setTotalCount(0);
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
       setColumns([]);
       setData([]);
       setTotalCount(0);
@@ -155,7 +154,6 @@ export function DataTable() {
                 </PaginationItem>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  // Show first page, last page, current page, and pages around current
                   if (
                     page === 1 ||
                     page === totalPages ||

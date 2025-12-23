@@ -18,10 +18,9 @@ export const useAuth = () => {
       // Set a timeout to ensure loading doesn't hang forever
       const timeoutId = setTimeout(() => {
         if (isMounted) {
-          console.warn('Auth init timeout - clearing loading state');
           setLoading(false);
         }
-      }, 10000); // 10 second timeout
+      }, 10000);
 
       try {
         // STEP 1: Read session from sessionStorage FIRST (Best Practice)
@@ -34,8 +33,6 @@ export const useAuth = () => {
           try {
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (!user || userError) {
-              // Token is invalid or revoked, clear it
-              console.warn('Invalid session token, clearing');
               await supabase.auth.signOut();
               if (isMounted) {
                 setUserId(null);
@@ -45,10 +42,6 @@ export const useAuth = () => {
               return;
             }
           } catch (userError) {
-            // Network error or other issue - don't clear session immediately
-            // Trust Supabase's autoRefreshToken to handle it
-            console.warn('Error validating session, but keeping it:', userError);
-            // Continue with session restoration
           }
         }
 
@@ -61,9 +54,6 @@ export const useAuth = () => {
             await syncProfileAndRole(session.user.id);
             hasSyncedRef.current = true;
           } catch (syncError) {
-            console.error('Error syncing profile in init:', syncError);
-            // Even if sync fails, we have a valid session
-            // Set userId to auth user id so user stays logged in
             if (isMounted) {
               setUserId(session.user.id);
               setRole('user');
@@ -107,8 +97,6 @@ export const useAuth = () => {
                 await syncProfileAndRole(session.user.id);
                 hasSyncedRef.current = true;
               } catch (error) {
-                console.error('Error in auth state change:', error);
-                // Keep user logged in with session but use defaults
                 if (isMounted) {
                   setUserId(session.user.id);
                   setRole('user');
@@ -142,8 +130,6 @@ export const useAuth = () => {
         });
         subscription = authSubscription;
       } catch (error) {
-        console.error('useAuth init error', error);
-        // On error, try to restore session one more time
         try {
           const { data: { session: errorSession } } = await supabase.auth.getSession();
           if (errorSession?.user && isMounted) {
@@ -194,8 +180,6 @@ export const useAuth = () => {
         .single();
 
       if (selErr && selErr.code !== 'PGRST116') {
-        // PGRST116 = no rows found, which is expected for new users
-        console.error('Error fetching profile:', selErr);
         throw selErr;
       }
 
@@ -208,7 +192,6 @@ export const useAuth = () => {
           .single();
 
         if (insertError) {
-          console.error('Error creating profile:', insertError);
           throw insertError;
         }
 
@@ -234,8 +217,6 @@ export const useAuth = () => {
         .eq('user_id', authUserId);
 
       if (rolesError) {
-        console.error('Error fetching roles:', rolesError);
-        // Don't throw, just set default role
         setRole('user');
         return;
       }
@@ -245,16 +226,12 @@ export const useAuth = () => {
         const hasAdmin = roles.find((r: any) => r.role === 'admin');
         setRole(hasAdmin ? 'admin' : roles[0].role);
       } else {
-        // If no role found, assign 'user' by default
         const { error: insertRoleError } = await supabase.from('user_roles').insert({ user_id: authUserId, role: 'user' });
         if (insertRoleError) {
-          console.error('Error inserting default role:', insertRoleError);
         }
         setRole('user');
       }
     } catch (error) {
-      console.error('syncProfileAndRole error', error);
-      // Re-throw so caller can handle it
       throw error;
     }
   };
@@ -332,8 +309,6 @@ export const useAuth = () => {
       try {
         await syncProfileAndRole(createdUser.id);
       } catch (err) {
-        console.error('Error syncing profile after signUp:', err);
-        // Not fatal - trigger created profile, state will sync on next auth change
       }
     } else {
       // Email confirmation required - profile will be created when user confirms email
@@ -347,10 +322,7 @@ export const useAuth = () => {
     try {
       await supabase.auth.signOut();
     } catch (error) {
-      console.error('Error during sign out:', error);
-      // Even if signOut fails, clear local state and storage
       try {
-        // Manually clear sessionStorage auth keys
         const keys = Object.keys(sessionStorage);
         keys.forEach(key => {
           if (key.startsWith('sb-')) {
@@ -358,10 +330,8 @@ export const useAuth = () => {
           }
         });
       } catch {
-        // Ignore storage errors
       }
     } finally {
-      // Always clear local state
       setUserId(null);
       setRole(null);
       setUserProfile(null);

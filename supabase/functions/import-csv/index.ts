@@ -434,11 +434,6 @@ serve(async (req) => {
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
       
-      // Log row for debugging (especially for ad_regions)
-      if (tableType === 'ad_regions') {
-        console.log(`Validating ad_regions row ${i + 2}:`, row);
-      }
-      
       const validation = validateRow(headers, row, tableType);
 
       if (!validation.valid) {
@@ -467,7 +462,6 @@ serve(async (req) => {
         validation.data.offer_hash = generateOfferHash(validation.data);
         } catch (hashError: any) {
           const rowNum = i + 2;
-          console.error('Error generating offer hash for row:', rowNum, hashError, validation.data);
           result.errors.push(`Row ${rowNum}: Failed to generate offer hash - ${hashError.message || 'Unknown error'}`);
           continue;
         }
@@ -486,20 +480,15 @@ serve(async (req) => {
       );
     }
 
-    // Import data
     if (validRows.length > 0) {
-      console.log(`Importing ${validRows.length} rows into ${tableType}`);
       let insertError = null;
       let insertedCount = 0;
       
       // Handle different conflict resolution based on table type
       if (tableType === 'offers') {
         // Offers table has offer_hash for deduplication
-        // Insert one by one to get better error messages
         for (const row of validRows) {
-          console.log(`Attempting to insert offer row:`, JSON.stringify(row));
-          
-          // Verify foreign key references before inserting
+          const { data: regionCheck, error: regionError } = await supabaseClient
           // Check region_id exists
           const { data: regionCheck, error: regionError } = await supabaseClient
             .from('ad_regions')
@@ -510,7 +499,6 @@ serve(async (req) => {
           if (regionError || !regionCheck) {
             const rowIndex = validRows.indexOf(row) + 2;
             const errorMsg = `Region ID "${row.region_id}" not found in ad_regions table. Make sure you've imported ad_regions first.`;
-            console.error(`Region validation failed for row:`, row, regionError);
             result.errors.push(`Row ${rowIndex}: ${errorMsg}`);
             if (!insertError) insertError = regionError || new Error(errorMsg);
             continue;
@@ -526,7 +514,6 @@ serve(async (req) => {
           if (ingredientError || !ingredientCheck) {
             const rowIndex = validRows.indexOf(row) + 2;
             const errorMsg = `Ingredient ID "${row.ingredient_id}" not found in ingredients table. Make sure you've imported ingredients first.`;
-            console.error(`Ingredient validation failed for row:`, row, ingredientError);
             result.errors.push(`Row ${rowIndex}: ${errorMsg}`);
             if (!insertError) insertError = ingredientError || new Error(errorMsg);
             continue;
@@ -543,14 +530,12 @@ serve(async (req) => {
             if (unitError || !unitCheck) {
               const rowIndex = validRows.indexOf(row) + 2;
               const errorMsg = `Unit "${row.unit_base}" not found in lookups_units table. Make sure you've imported units lookup first.`;
-              console.error(`Unit validation failed for row:`, row, unitError);
               result.errors.push(`Row ${rowIndex}: ${errorMsg}`);
               if (!insertError) insertError = unitError || new Error(errorMsg);
               continue;
             }
           }
           
-          // Check chain_id exists
           const { data: chainCheck, error: chainError } = await supabaseClient
             .from('chains')
             .select('chain_id')
@@ -560,7 +545,6 @@ serve(async (req) => {
           if (chainError || !chainCheck) {
             const rowIndex = validRows.indexOf(row) + 2;
             const errorMsg = `Chain ID "${row.chain_id}" not found in chains table. Make sure you've imported chains first.`;
-            console.error(`Chain validation failed for row:`, row, chainError);
             result.errors.push(`Row ${rowIndex}: ${errorMsg}`);
             if (!insertError) insertError = chainError || new Error(errorMsg);
             continue;
@@ -594,9 +578,7 @@ serve(async (req) => {
             .eq('offer_hash', row.offer_hash)
             .maybeSingle();
           
-          if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" which is OK
-            console.error(`Error checking for existing offer:`, checkError);
-            // Continue anyway - try to insert
+          if (checkError && checkError.code !== 'PGRST116') {
           }
           
           let error, data;
@@ -617,14 +599,6 @@ serve(async (req) => {
             delete (finalInsertData as any).created_at;
             delete (finalInsertData as any).updated_at;
             
-            // Verify the object doesn't have these keys
-            if ('offer_id' in finalInsertData || 'created_at' in finalInsertData || 'updated_at' in finalInsertData) {
-              console.error('ERROR: offer_id, created_at, or updated_at found in insertData!', finalInsertData);
-            }
-            
-            console.log(`Inserting new offer with data:`, JSON.stringify(finalInsertData));
-            console.log(`Keys in insertData:`, Object.keys(finalInsertData));
-            
             const { error: insertError, data: insertDataResult } = await supabaseClient
             .from(tableType)
               .insert(finalInsertData)
@@ -632,20 +606,9 @@ serve(async (req) => {
             
             error = insertError;
             data = insertDataResult;
-            
-            if (error) {
-              console.error(`Insert error details:`, JSON.stringify(error, null, 2));
-              console.error(`Insert data that failed:`, JSON.stringify(finalInsertData, null, 2));
-              console.error(`All keys in failed data:`, Object.keys(finalInsertData));
-            }
           }
           if (error) {
-            console.error(`Error inserting offer row:`, row, error);
-            console.error(`Error code:`, (error as any).code);
-            console.error(`Error message:`, error.message);
-            console.error(`Error details:`, (error as any).details);
-            console.error(`Error hint:`, (error as any).hint);
-            const rowIndex = validRows.indexOf(row) + 2; // +2 for header and 0-index
+            const rowIndex = validRows.indexOf(row) + 2;
             const errorAny = error as any;
             let errorMsg = error.message || 'Unknown error';
             
@@ -675,10 +638,9 @@ serve(async (req) => {
             
             result.errors.push(`Row ${rowIndex}: ${errorMsg}`);
             if (!insertError) insertError = error;
-            continue; // Continue with next row instead of breaking
+            continue;
           }
           if (data && data.length > 0) {
-            console.log(`Successfully inserted/updated offer row:`, data[0]);
             insertedCount++;
           }
         }
@@ -730,11 +692,8 @@ serve(async (req) => {
       } else if (tableType === 'ad_regions') {
         // Ad regions uses composite primary key (region_id, chain_id)
         // This allows the same region_id to be used across different chains
-        // Insert one by one to handle duplicates better and get better error messages
         for (const row of validRows) {
-          console.log(`Attempting to insert ad_regions row:`, JSON.stringify(row));
-          
-          // First, verify the chain_id exists
+          const { data: chainCheck, error: chainError } = await supabaseClient
           const { data: chainCheck, error: chainError } = await supabaseClient
             .from('chains')
             .select('chain_id')
@@ -744,7 +703,6 @@ serve(async (req) => {
           if (chainError || !chainCheck) {
             const rowIndex = validRows.indexOf(row) + 2;
             const errorMsg = `Chain ID "${row.chain_id}" not found in chains table. Make sure you've imported chains first.`;
-            console.error(`Chain validation failed for row:`, row, chainError);
             result.errors.push(`Row ${rowIndex}: ${errorMsg}`);
             if (!insertError) insertError = chainError || new Error(errorMsg);
             continue;
@@ -758,12 +716,7 @@ serve(async (req) => {
           })
           .select();
           if (error) {
-            console.error(`Error inserting ad_regions row:`, row, error);
-            console.error(`Error code:`, error.code);
-            console.error(`Error message:`, error.message);
-            console.error(`Error details:`, error.details);
-            console.error(`Error hint:`, error.hint);
-            const rowIndex = validRows.indexOf(row) + 2; // +2 for header and 0-index
+            const rowIndex = validRows.indexOf(row) + 2;
             let errorMsg = error.message || 'Unknown error';
             
             // Enhance error message with context
@@ -790,10 +743,9 @@ serve(async (req) => {
             
             result.errors.push(`Row ${rowIndex}: ${errorMsg}`);
             if (!insertError) insertError = error;
-            continue; // Continue with next row
+            continue;
           }
           if (data && data.length > 0) {
-            console.log(`Successfully inserted/updated ad_regions row:`, data[0]);
             insertedCount++;
           }
         }
@@ -831,8 +783,7 @@ serve(async (req) => {
             })
             .select();
           if (error) {
-            console.error(`Error inserting store_region_map row:`, row, error);
-            const rowIndex = validRows.indexOf(row) + 2; // +2 for header and 0-index
+            const rowIndex = validRows.indexOf(row) + 2;
             let errorMsg = error.message || 'Unknown error';
             
             // Enhance error message with context
@@ -873,8 +824,7 @@ serve(async (req) => {
             })
             .select();
           if (error) {
-            console.error(`Error inserting dish_ingredient row:`, row, error);
-            const rowIndex = validRows.indexOf(row) + 2; // +2 for header and 0-index
+            const rowIndex = validRows.indexOf(row) + 2;
             let errorMsg = error.message || 'Unknown error';
             
             // Enhance error message with context
@@ -905,13 +855,7 @@ serve(async (req) => {
       }
 
       if (insertError && insertedCount === 0) {
-        // Only return error if no rows were inserted at all
-        console.error('Insert error:', insertError);
-        console.error('Error details:', JSON.stringify(insertError, null, 2));
         const errorAny = insertError as any;
-        console.error('Error code:', errorAny.code);
-        console.error('Error hint:', errorAny.hint);
-        console.error('Error details:', errorAny.details);
         result.imported = insertedCount;
         
         // Extract detailed error message
@@ -989,15 +933,12 @@ serve(async (req) => {
         );
       }
       
-      // If some rows were inserted but there were errors, continue
       if (insertError && insertedCount > 0) {
-        console.warn('Partial import success:', insertedCount, 'rows inserted, but errors occurred');
         if (!result.errors.some(e => e.includes('Partial import'))) {
           result.errors.push(`Partial import: ${insertedCount} rows imported, but some errors occurred.`);
         }
       }
 
-      console.log(`Successfully imported ${insertedCount || validRows.length} rows`);
       result.imported = insertedCount || validRows.length;
       
       // If there were errors but some rows were imported, still return success with warnings
@@ -1009,20 +950,14 @@ serve(async (req) => {
         );
       }
     } else {
-      console.log('No valid rows to import');
       result.imported = 0;
     }
 
-    console.log('Final result:', JSON.stringify(result));
     return new Response(
       JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
-    console.error('Unhandled error in import-csv function:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Error details:', JSON.stringify(error, null, 2));
-    
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Unknown error occurred',

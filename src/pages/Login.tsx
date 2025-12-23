@@ -55,35 +55,28 @@ export default function Login() {
           await signUp(email, password, username.trim() || undefined, plz.trim() || undefined);
           toast.success('Account created successfully! If your account requires confirmation, please verify your email before signing in.');
           setIsSignUp(false);
-          // Clear form
           setEmail('');
           setPassword('');
           setUsername('');
           setPlz('');
-          // after signup, don't auto-navigate; user should sign in (or confirm email)
           return;
         } catch (signupError: any) {
-          // Handle signup-specific errors
           const errorMsg = signupError.message?.toLowerCase() || '';
           
-          // Check for username uniqueness violation (from database constraint)
           if (errorMsg.includes('username') && (errorMsg.includes('unique') || errorMsg.includes('duplicate'))) {
             toast.error('This username is already taken. Please choose a different username.');
             setIsLoading(false);
             return;
           }
           
-          // Re-throw to be handled by outer catch
           throw signupError;
         }
       }
 
       await signIn(email, password);
       
-      // Wait a moment for auth state to propagate
       await new Promise(resolve => setTimeout(resolve, 200));
       
-      // Check role directly from database after sign in
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.user) {
@@ -99,13 +92,11 @@ export default function Login() {
         .eq('user_id', session.user.id);
       
       if (roleError) {
-        console.error('Error fetching user role:', roleError);
         toast.success('Signed in');
         navigate('/');
         return;
       }
       
-      // Check if user has admin role
       const isAdmin = roles?.some((r: any) => r.role === 'admin') || false;
       
       

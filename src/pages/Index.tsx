@@ -170,7 +170,6 @@ export default function Index() {
         setUserPLZ(plz);
       }
     } catch (error) {
-      console.error('Error loading user data:', error);
     }
   };
 
@@ -192,7 +191,6 @@ export default function Index() {
         }
       }
     } catch (error) {
-      console.error('Error loading filter options:', error);
     }
   };
 
@@ -202,7 +200,6 @@ export default function Index() {
       const favorites = await api.getFavorites(userId);
       setFavoriteDishIds(favorites);
     } catch (error) {
-      console.error('Error loading favorites:', error);
     }
   };
 
@@ -220,15 +217,12 @@ export default function Index() {
         isMealPrep: showMealPrep ? true : undefined,
       };
 
-      // Fetch all dishes (or a very high limit) to ensure we get all dishes that match filters
-      // The actual filtering happens after fetching based on offers/display criteria
       let dishesData = await api.getDishes(filters, 10000); 
 
       // Load favorites for user
       const favorites = await api.getFavorites(userId);
       setFavoriteDishIds(favorites);
 
-      // Filter to favorites only if in favorites view
       if (viewMode === 'favorites') {
         dishesData = dishesData.filter((dish) => favorites.includes(dish.dish_id));
       }
@@ -238,12 +232,10 @@ export default function Index() {
         isFavorite: favorites.includes(dish.dish_id),
       }));
 
-      // Sort dishes
       const sortedDishes = sortDishes(dishesWithFavorites, sortBy, sortDirection);
 
       setDishes(sortedDishes);
       
-      // Reset to page 1 when filters change (but not when just changing page)
       if (currentPage > 1) {
         const totalPages = Math.ceil(sortedDishes.length / itemsPerPage);
         if (currentPage > totalPages) {
@@ -252,7 +244,6 @@ export default function Index() {
         }
       }
     } catch (error: any) {
-      console.error('Error loading dishes:', error);
       toast.error(error?.message || 'Failed to load dishes. Please refresh the page.');
     } finally {
       setLoading(false);
@@ -310,12 +301,9 @@ export default function Index() {
 
     try {
       await api.updateUserPLZ(userId, plz);
-      await updatePLZ(plz); // Also update via auth hook for consistency
+      await updatePLZ(plz);
       setUserPLZ(plz);
-      // loadDishes will be triggered by useEffect
     } catch (error: any) {
-      console.error('Error updating PLZ:', error);
-      // Error message from API will be more specific
       throw new Error(error?.message || 'Failed to update location. Please check your postal code and try again.');
     }
   };
@@ -333,10 +321,8 @@ export default function Index() {
         toast.success('Added to favorites');
       }
       
-      // Update favorites list
       await loadFavorites();
       
-      // Update favorite status in current dishes list (optimistic update)
       setDishes((prevDishes) =>
         prevDishes.map((dish) =>
           dish.dish_id === dishId
@@ -354,13 +340,9 @@ export default function Index() {
         }
       });
       
-      // Optionally reload dishes in background (but don't block on errors)
       loadDishes().catch((error) => {
-        // Silently handle errors - we've already updated the UI optimistically
-        console.error('Error reloading dishes after favorite toggle:', error);
       });
     } catch (error: any) {
-      console.error('Error toggling favorite:', error);
       toast.error(error?.message || 'Failed to update favorite. Please try again.');
     }
   };
@@ -375,44 +357,42 @@ export default function Index() {
     }
   };
 
-  // Wrapper functions that update both state and URL params
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
-    setCurrentPage(1); // Reset to page 1 when filter changes
+    setCurrentPage(1);
     updateURLParams({ category, page: 1 });
   };
 
   const handleChainChange = (chain: string) => {
     setSelectedChain(chain);
-    setCurrentPage(1); // Reset to page 1 when filter changes
+    setCurrentPage(1);
     updateURLParams({ chain, page: 1 });
   };
 
   const handleMaxPriceChange = (price: number) => {
     setMaxPrice(price);
-    setCurrentPage(1); // Reset to page 1 when filter changes
+    setCurrentPage(1);
     updateURLParams({ maxPrice: price, page: 1 });
   };
 
   const handleQuickMealsChange = (show: boolean) => {
     setShowQuickMeals(show);
-    setCurrentPage(1); // Reset to page 1 when filter changes
+    setCurrentPage(1);
     updateURLParams({ quickMeals: show, page: 1 });
   };
 
   const handleMealPrepChange = (show: boolean) => {
     setShowMealPrep(show);
-    setCurrentPage(1); // Reset to page 1 when filter changes
+    setCurrentPage(1);
     updateURLParams({ mealPrep: show, page: 1 });
   };
 
   const handleViewModeChange = (mode: 'all' | 'favorites') => {
     setViewMode(mode);
-    setCurrentPage(1); // Reset to page 1 when view changes
+    setCurrentPage(1);
     updateURLParams({ view: mode, page: 1 });
   };
 
-  // Calculate pagination
   const totalPages = Math.ceil(dishes.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -421,7 +401,6 @@ export default function Index() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     updateURLParams({ page });
-    // Maintain scroll position when changing pages
   };
 
   if (authLoading || loading) {
