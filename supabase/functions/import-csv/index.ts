@@ -476,7 +476,6 @@ serve(async (req) => {
       if (tableType === 'offers') {
         // Offers table has offer_hash for deduplication
         for (const row of validRows) {
-          const { data: regionCheck, error: regionError } = await supabaseClient
           // Check region_id exists
           const { data: regionCheck, error: regionError } = await supabaseClient
             .from('ad_regions')
@@ -681,7 +680,6 @@ serve(async (req) => {
         // Ad regions uses composite primary key (region_id, chain_id)
         // This allows the same region_id to be used across different chains
         for (const row of validRows) {
-          const { data: chainCheck, error: chainError } = await supabaseClient
           const { data: chainCheck, error: chainError } = await supabaseClient
             .from('chains')
             .select('chain_id')
