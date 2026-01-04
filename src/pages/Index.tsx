@@ -16,7 +16,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { ShoppingCart, Sparkles, LogOut, ArrowUpDown, Heart, User, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Sparkles, LogOut, ArrowUpDown, Heart, User, ChevronDown, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -47,8 +47,15 @@ export default function Index() {
   const [sortBy, setSortBy] = useState<'savings' | 'name'>(() => (searchParams.get('sortBy') as 'savings' | 'name') || 'savings');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(() => (searchParams.get('sortDir') as 'asc' | 'desc') || 'desc');
   const [loading, setLoading] = useState(true);
-  const [userPLZ, setUserPLZ] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'all' | 'favorites'>(() => (searchParams.get('view') as 'all' | 'favorites') || 'all');
+  // Use localStorage for PLZ when not authenticated, otherwise use user's PLZ
+  const [userPLZ, setUserPLZ] = useState<string>(() => {
+    const storedPLZ = localStorage.getItem('guestPLZ');
+    return storedPLZ || '30165';
+  });
+  const [viewMode, setViewMode] = useState<'all' | 'favorites'>(() => {
+    const view = searchParams.get('view') as 'all' | 'favorites';
+    return view || 'all';
+  });
   const [favoriteDishIds, setFavoriteDishIds] = useState<string[]>([]);
   
   const itemsPerPage = 12;
@@ -140,23 +147,29 @@ export default function Index() {
     }
   }, [userId]);
 
+  // Load filter options whenever PLZ changes (works with or without auth)
   useEffect(() => {
-    if (userId) {
-      loadFilterOptions();
-    }
-  }, [userId, userPLZ]);
+    loadFilterOptions();
+  }, [userPLZ]);
 
+  // Load favorites only when logged in
   useEffect(() => {
     if (userId) {
       loadFavorites();
+    } else {
+      setFavoriteDishIds([]);
+      // Reset to 'all' view if not logged in and viewing favorites
+      if (viewMode === 'favorites') {
+        setViewMode('all');
+        updateURLParams({ view: 'all' });
+      }
     }
   }, [userId]);
 
+  // Load dishes whenever filters change (works with or without auth)
   useEffect(() => {
-    if (userId) {
-      loadDishes();
-    }
-  }, [userId, selectedCategory, selectedChain, maxPrice, userPLZ, showQuickMeals, showMealPrep, viewMode]);
+    loadDishes();
+  }, [selectedCategory, selectedChain, maxPrice, userPLZ, showQuickMeals, showMealPrep, viewMode, userId]);
 
   const loadUserData = async () => {
     if (!userId) return;
@@ -200,7 +213,12 @@ export default function Index() {
   };
 
   const loadDishes = async () => {
-    if (!userId) return;
+    // Don't load favorites view if not logged in
+    if (viewMode === 'favorites' && !userId) {
+      setViewMode('all');
+      updateURLParams({ view: 'all' });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -215,16 +233,22 @@ export default function Index() {
 
       let dishesData = await api.getDishes(filters, 10000); 
 
-      const favorites = await api.getFavorites(userId);
-      setFavoriteDishIds(favorites);
+      // Only load favorites if logged in
+      let favorites: string[] = [];
+      if (userId) {
+        favorites = await api.getFavorites(userId);
+        setFavoriteDishIds(favorites);
+      } else {
+        setFavoriteDishIds([]);
+      }
 
-      if (viewMode === 'favorites') {
+      if (viewMode === 'favorites' && userId) {
         dishesData = dishesData.filter((dish) => favorites.includes(dish.dish_id));
       }
 
       const dishesWithFavorites: Dish[] = dishesData.map((dish) => ({
         ...dish,
-        isFavorite: favorites.includes(dish.dish_id),
+        isFavorite: userId ? favorites.includes(dish.dish_id) : false,
       }));
 
       const sortedDishes = sortDishes(dishesWithFavorites, sortBy, sortDirection);
@@ -281,16 +305,20 @@ export default function Index() {
   };
 
   const handlePLZChange = async (plz: string) => {
-    if (!userId) return;
-
     const isValid = await api.validatePLZ(plz);
     if (!isValid) {
       throw new Error('Postal code not found. Please enter a valid postal code that exists in our database.');
     }
 
     try {
-      await api.updateUserPLZ(userId, plz);
-      await updatePLZ(plz);
+      if (userId) {
+        // If logged in, save to user profile
+        await api.updateUserPLZ(userId, plz);
+        await updatePLZ(plz);
+      } else {
+        // If not logged in, save to localStorage
+        localStorage.setItem('guestPLZ', plz);
+      }
       setUserPLZ(plz);
     } catch (error: any) {
       throw new Error(error?.message || 'Failed to update location. Please check your postal code and try again.');
@@ -391,7 +419,8 @@ export default function Index() {
     updateURLParams({ page });
   };
 
-  if (authLoading || loading) {
+  // Only show loading for dish loading, not auth loading (so page loads immediately)
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -410,49 +439,61 @@ export default function Index() {
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
-              <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {userProfile?.username 
-                        ? userProfile.username.charAt(0).toUpperCase()
-                        : userProfile?.email 
-                        ? userProfile.email.charAt(0).toUpperCase()
-                        : 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="hidden md:flex flex-col items-start">
-                    <span className="text-sm font-medium">
-                      {userProfile?.username || userProfile?.email || 'User'}
-                    </span>
-                    {userProfile?.username && userProfile?.email && (
-                      <span className="text-xs text-muted-foreground">{userProfile.email}</span>
-                    )}
-                  </div>
-                  <ChevronDown className="h-4 w-4 hidden md:block" />
+              {userId ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-primary/10 text-primary">
+                          {userProfile?.username 
+                            ? userProfile.username.charAt(0).toUpperCase()
+                            : userProfile?.email 
+                            ? userProfile.email.charAt(0).toUpperCase()
+                            : 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="hidden md:flex flex-col items-start">
+                        <span className="text-sm font-medium">
+                          {userProfile?.username || userProfile?.email || 'User'}
+                        </span>
+                        {userProfile?.username && userProfile?.email && (
+                          <span className="text-xs text-muted-foreground">{userProfile.email}</span>
+                        )}
+                      </div>
+                      <ChevronDown className="h-4 w-4 hidden md:block" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {userProfile?.username || 'User'}
+                        </p>
+                        {userProfile?.email && (
+                          <p className="text-xs leading-none text-muted-foreground">
+                            {userProfile.email}
+                          </p>
+                        )}
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign Out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/login')}
+                  className="flex items-center gap-2"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span className="hidden md:inline">Login</span>
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {userProfile?.username || 'User'}
-                    </p>
-                    {userProfile?.email && (
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {userProfile.email}
-                      </p>
-                    )}
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign Out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              )}
             </div>
           </div>
         </div>
@@ -498,7 +539,13 @@ export default function Index() {
           </aside>
 
           <main className="lg:col-span-3">
-            <Tabs value={viewMode} onValueChange={(value) => handleViewModeChange(value as 'all' | 'favorites')} className="w-full">
+            <Tabs value={viewMode} onValueChange={(value) => {
+              if (value === 'favorites' && !userId) {
+                toast.info('Please login to view your favorites');
+                return;
+              }
+              handleViewModeChange(value as 'all' | 'favorites');
+            }} className="w-full">
               <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
                 <div className="flex-1">
                   <TabsList className="mb-4">
@@ -506,15 +553,17 @@ export default function Index() {
                       <ShoppingCart className="h-4 w-4" />
                       Available Meals
                     </TabsTrigger>
-                    <TabsTrigger value="favorites" className="flex items-center gap-2">
-                      <Heart className="h-4 w-4" />
-                      Favorites
-                      {favoriteDishIds.length > 0 && (
-                        <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
-                          {favoriteDishIds.length}
-                        </span>
-                      )}
-                    </TabsTrigger>
+                    {userId && (
+                      <TabsTrigger value="favorites" className="flex items-center gap-2">
+                        <Heart className="h-4 w-4" />
+                        Favorites
+                        {favoriteDishIds.length > 0 && (
+                          <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
+                            {favoriteDishIds.length}
+                          </span>
+                        )}
+                      </TabsTrigger>
+                    )}
                   </TabsList>
                   <p className="text-muted-foreground">
                     {viewMode === 'favorites' 
@@ -548,7 +597,11 @@ export default function Index() {
               <TabsContent value="all" className="mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {paginatedDishes.map((dish) => (
-                    <DishCard key={dish.dish_id} dish={dish} onFavorite={handleFavorite} />
+                    <DishCard 
+                      key={dish.dish_id} 
+                      dish={dish} 
+                      onFavorite={userId ? handleFavorite : undefined} 
+                    />
                   ))}
                 </div>
 
@@ -634,7 +687,11 @@ export default function Index() {
               <TabsContent value="favorites" className="mt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {paginatedDishes.map((dish) => (
-                    <DishCard key={dish.dish_id} dish={dish} onFavorite={handleFavorite} />
+                    <DishCard 
+                      key={dish.dish_id} 
+                      dish={dish} 
+                      onFavorite={userId ? handleFavorite : undefined} 
+                    />
                   ))}
                 </div>
 

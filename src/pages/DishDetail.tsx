@@ -14,7 +14,8 @@ import {
   ShoppingCart, 
   Euro,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  LogIn
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -29,15 +30,24 @@ export default function DishDetail() {
   const [dish, setDish] = useState<Dish | null>(null);
   const [ingredients, setIngredients] = useState<DishIngredient[]>([]);
   const [pricing, setPricing] = useState<DishPricing | null>(null);
-  const [userPLZ, setUserPLZ] = useState<string>('');
+  // Use localStorage for PLZ when not authenticated
+  const [userPLZ, setUserPLZ] = useState<string>(() => {
+    const storedPLZ = localStorage.getItem('guestPLZ');
+    return storedPLZ || '30165';
+  });
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedChainName, setSelectedChainName] = useState<string | null>(null);
   const [selectedChainId, setSelectedChainId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (dishId && userId) {
-      loadUserPLZ();
+    if (dishId) {
+      if (userId) {
+        loadUserPLZ();
+      } else {
+        // Load dish data even without userId
+        loadDishData();
+      }
     }
   }, [dishId, userId]);
 
@@ -57,10 +67,10 @@ export default function DishDetail() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (dishId && userId) {
+    if (dishId) {
       loadDishData();
     }
-  }, [dishId, userId, userPLZ, selectedChainId]);
+  }, [dishId, userPLZ, selectedChainId, userId]);
 
   const loadUserPLZ = async () => {
     if (!userId) return;
@@ -164,6 +174,17 @@ export default function DishDetail() {
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              {!userId && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/login')}
+                  className="flex items-center gap-2"
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span className="hidden md:inline">Login</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -190,20 +211,22 @@ export default function DishDetail() {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-4">
                   <CardTitle className="text-3xl">{dish.name}</CardTitle>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={handleFavorite}
-                    className="shrink-0"
-                    title={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                  >
-                    <Heart
-                      className={cn(
-                        'h-6 w-6',
-                        isFavorite && 'fill-destructive text-destructive'
-                      )}
-                    />
-                  </Button>
+                  {userId && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={handleFavorite}
+                      className="shrink-0"
+                      title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      <Heart
+                        className={cn(
+                          'h-6 w-6',
+                          isFavorite && 'fill-destructive text-destructive'
+                        )}
+                      />
+                    </Button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary">{dish.category}</Badge>

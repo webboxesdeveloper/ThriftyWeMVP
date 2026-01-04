@@ -25,8 +25,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<RequireAuth><Index /></RequireAuth>} />
-            <Route path="/dish/:dishId" element={<RequireAuth><DishDetail /></RequireAuth>} />
+            <Route path="/" element={<Index />} />
+            <Route path="/dish/:dishId" element={<DishDetail />} />
             <Route path="/admin/dashboard" element={<RequireAuth adminOnly><AdminDashboard /></RequireAuth>} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
