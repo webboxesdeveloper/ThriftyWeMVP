@@ -476,12 +476,14 @@ serve(async (req) => {
       if (tableType === 'offers') {
         // Offers table has offer_hash for deduplication
         for (const row of validRows) {
-          // Check region_id exists
+          // Check region_id exists in ad_regions
+          // Use limit(1).maybeSingle() to handle cases where region_id might exist multiple times
           const { data: regionCheck, error: regionError } = await supabaseClient
             .from('ad_regions')
             .select('region_id')
             .eq('region_id', row.region_id)
-            .single();
+            .limit(1)
+            .maybeSingle();
           
           if (regionError || !regionCheck) {
             const rowIndex = validRows.indexOf(row) + 2;
