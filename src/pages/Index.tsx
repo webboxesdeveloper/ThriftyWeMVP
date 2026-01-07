@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import useAuth from '@/hooks/useAuth';
 import { api, type Dish, type DishFilters } from '@/services/api';
 import { PLZInput } from '@/components/PLZInput';
@@ -33,7 +33,9 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 export default function Index() {
   const { userId, loading: authLoading, updatePLZ, signOut, userProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const scrollRestoredRef = useRef(false);
   
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -138,6 +140,14 @@ export default function Index() {
       }
     }
     
+    if (updates.page !== undefined) {
+      if (updates.page === 1) {
+        newParams.delete('page');
+      } else {
+        newParams.set('page', updates.page.toString());
+      }
+    }
+    
     setSearchParams(newParams, { replace: true });
   };
 
@@ -166,10 +176,65 @@ export default function Index() {
     }
   }, [userId]);
 
+  // Sync currentPage with URL params (important when returning from detail page)
+  useEffect(() => {
+    const pageFromURL = parseInt(searchParams.get('page') || '1', 10);
+    if (pageFromURL !== currentPage) {
+      setCurrentPage(pageFromURL);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Load dishes whenever filters change (works with or without auth)
   useEffect(() => {
     loadDishes();
   }, [selectedCategory, selectedChain, maxPrice, userPLZ, showQuickMeals, showMealPrep, viewMode, userId]);
+
+  // Restore scroll position when returning from dish detail
+  useEffect(() => {
+    // Only restore if we have a saved scroll position and data is loaded
+    if (!loading && dishes.length > 0) {
+      const savedScrollPosition = sessionStorage.getItem('scrollPosition');
+      if (savedScrollPosition && !scrollRestoredRef.current) {
+        // Use requestAnimationFrame to ensure DOM is fully rendered
+        requestAnimationFrame(() => {
+          window.scrollTo({
+            top: parseInt(savedScrollPosition, 10),
+            behavior: 'auto' // Instant scroll, not smooth
+          });
+          sessionStorage.removeItem('scrollPosition');
+          scrollRestoredRef.current = true;
+        });
+      }
+    }
+  }, [loading, dishes.length]);
+
+  // Save scroll position while scrolling (for when user navigates away)
+  useEffect(() => {
+    const handleScroll = () => {
+      if (location.pathname === '/') {
+        sessionStorage.setItem('scrollPosition', window.scrollY.toString());
+      }
+    };
+
+    // Throttle scroll events for better performance
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', throttledScroll);
+    };
+  }, [location.pathname]);
 
   const loadUserData = async () => {
     if (!userId) return;
@@ -417,6 +482,73 @@ export default function Index() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     updateURLParams({ page });
+    // Save current scroll position so it can be restored if user navigates to detail and back
+    sessionStorage.setItem('scrollPosition', window.scrollY.toString());
+    // Don't scroll to top - keep current scroll position when changing pages
+  };
+
+  // Reusable pagination component
+  const renderPagination = () => {
+    if (dishes.length === 0 || totalPages <= 1) return null;
+
+    return (
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage > 1) handlePageChange(currentPage - 1);
+              }}
+              className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              href="#"
+            />
+          </PaginationItem>
+          
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+            if (
+              page === 1 ||
+              page === totalPages ||
+              (page >= currentPage - 1 && page <= currentPage + 1)
+            ) {
+              return (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handlePageChange(page);
+                    }}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                    href="#"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              );
+            } else if (page === currentPage - 2 || page === currentPage + 2) {
+              return (
+                <PaginationItem key={page}>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              );
+            }
+            return null;
+          })}
+          
+          <PaginationItem>
+            <PaginationNext
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage < totalPages) handlePageChange(currentPage + 1);
+              }}
+              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              href="#"
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    );
   };
 
   // Only show loading for dish loading, not auth loading (so page loads immediately)
@@ -546,6 +678,11 @@ export default function Index() {
               }
               handleViewModeChange(value as 'all' | 'favorites');
             }} className="w-full">
+              {/* Pagination at top - sticky (both mobile and desktop) */}
+              <div className="sticky top-[73px] z-10 bg-background/95 backdrop-blur-sm border-b pb-4 mb-6 -mx-4 px-4">
+                {renderPagination()}
+              </div>
+              
               <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
                 <div className="flex-1">
                   <TabsList className="mb-4">
@@ -622,66 +759,6 @@ export default function Index() {
                   </div>
                 )}
 
-                {dishes.length > 0 && totalPages > 1 && (
-                  <div className="mt-8">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage > 1) handlePageChange(currentPage - 1);
-                            }}
-                            className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                            href="#"
-                          />
-                        </PaginationItem>
-                        
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                          if (
-                            page === 1 ||
-                            page === totalPages ||
-                            (page >= currentPage - 1 && page <= currentPage + 1)
-                          ) {
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handlePageChange(page);
-                                  }}
-                                  isActive={currentPage === page}
-                                  className="cursor-pointer"
-                                  href="#"
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            );
-                          } else if (page === currentPage - 2 || page === currentPage + 2) {
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationEllipsis />
-                              </PaginationItem>
-                            );
-                          }
-                          return null;
-                        })}
-                        
-                        <PaginationItem>
-                          <PaginationNext
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage < totalPages) handlePageChange(currentPage + 1);
-                            }}
-                            className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                            href="#"
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </div>
-                )}
               </TabsContent>
 
               <TabsContent value="favorites" className="mt-0">
@@ -712,66 +789,6 @@ export default function Index() {
                   </div>
                 )}
 
-                {dishes.length > 0 && totalPages > 1 && (
-                  <div className="mt-8">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage > 1) handlePageChange(currentPage - 1);
-                            }}
-                            className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                            href="#"
-                          />
-                        </PaginationItem>
-                        
-                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                          if (
-                            page === 1 ||
-                            page === totalPages ||
-                            (page >= currentPage - 1 && page <= currentPage + 1)
-                          ) {
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handlePageChange(page);
-                                  }}
-                                  isActive={currentPage === page}
-                                  className="cursor-pointer"
-                                  href="#"
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            );
-                          } else if (page === currentPage - 2 || page === currentPage + 2) {
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationEllipsis />
-                              </PaginationItem>
-                            );
-                          }
-                          return null;
-                        })}
-                        
-                        <PaginationItem>
-                          <PaginationNext
-                            onClick={(e) => {
-                              e.preventDefault();
-                              if (currentPage < totalPages) handlePageChange(currentPage + 1);
-                            }}
-                            className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                            href="#"
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </div>
-                )}
               </TabsContent>
             </Tabs>
 

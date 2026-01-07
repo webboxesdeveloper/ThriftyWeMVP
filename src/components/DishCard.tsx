@@ -1,4 +1,4 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,12 +24,20 @@ interface DishCardProps {
 export function DishCard({ dish, onFavorite }: DishCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const hasOffers = (dish.availableOffers ?? 0) > 0;
   const hasSavings = dish.totalAggregatedSavings && dish.totalAggregatedSavings > 0;
 
   const handleCardClick = () => {
-    navigate(`/dish/${dish.dish_id}${location.search}`);
+    // Save current scroll position before navigating
+    sessionStorage.setItem('scrollPosition', window.scrollY.toString());
+    // Use searchParams.toString() to get current URL params including page number
+    const queryString = searchParams.toString();
+    const url = `/dish/${dish.dish_id}${queryString ? `?${queryString}` : ''}`;
+    navigate(url, {
+      state: { fromIndex: true }
+    });
   };
 
   const handleFavoriteClick = (e: React.MouseEvent) => {

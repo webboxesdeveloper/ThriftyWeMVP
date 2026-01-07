@@ -144,7 +144,14 @@ export default function DishDetail() {
         <div className="text-center space-y-4">
           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
           <h2 className="text-2xl font-bold">Dish not found</h2>
-          <Button onClick={() => navigate(`/${location.search}`)}>
+          <Button onClick={() => {
+            // Preserve scroll position when navigating back
+            const savedScroll = sessionStorage.getItem('scrollPosition');
+            if (!savedScroll) {
+              sessionStorage.setItem('scrollPosition', '0');
+            }
+            navigate(`/${location.search}`, { state: { fromDetail: true } });
+          }}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dishes
           </Button>
@@ -164,7 +171,15 @@ export default function DishDetail() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate(`/${location.search}`)}>
+              <Button variant="ghost" size="icon" onClick={() => {
+                // Preserve scroll position when navigating back
+                const savedScroll = sessionStorage.getItem('scrollPosition');
+                if (!savedScroll) {
+                  // If no saved position, save current (shouldn't happen, but just in case)
+                  sessionStorage.setItem('scrollPosition', '0');
+                }
+                navigate(`/${location.search}`, { state: { fromDetail: true } });
+              }}>
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-2">
