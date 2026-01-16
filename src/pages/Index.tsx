@@ -482,9 +482,10 @@ export default function Index() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     updateURLParams({ page });
-    // Save current scroll position so it can be restored if user navigates to detail and back
-    sessionStorage.setItem('scrollPosition', window.scrollY.toString());
-    // Don't scroll to top - keep current scroll position when changing pages
+    // Scroll to top when changing pages
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Clear saved scroll position since we're changing pages
+    sessionStorage.removeItem('scrollPosition');
   };
 
   // Reusable pagination component
