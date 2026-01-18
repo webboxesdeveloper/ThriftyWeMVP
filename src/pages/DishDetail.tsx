@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { getLocalFavorites, addLocalFavorite, removeLocalFavorite, isLocalFavorite } from '@/utils/favorites';
 
 export default function DishDetail() {
   const { dishId } = useParams<{ dishId: string }>();
@@ -109,7 +110,13 @@ export default function DishDetail() {
       setDish(dishData);
       setIngredients(ingredientsData);
       setPricing(pricingData);
-      setIsFavorite(favorites.includes(dishId));
+      
+      // Check if favorite (from database if logged in, from localStorage if not)
+      if (userId) {
+        setIsFavorite(favorites.includes(dishId));
+      } else {
+        setIsFavorite(isLocalFavorite(dishId));
+      }
     } catch (error: any) {
       toast.error(error?.message || 'Failed to load dish details');
     } finally {
@@ -118,17 +125,31 @@ export default function DishDetail() {
   };
 
   const handleFavorite = async () => {
-    if (!userId || !dishId) return;
+    if (!dishId) return;
 
     try {
-      if (isFavorite) {
-        await api.removeFavorite(userId, dishId);
-        setIsFavorite(false);
-        toast.success('Removed from favorites');
+      if (userId) {
+        // Logged-in: use database
+        if (isFavorite) {
+          await api.removeFavorite(userId, dishId);
+          setIsFavorite(false);
+          toast.success('Removed from favorites');
+        } else {
+          await api.addFavorite(userId, dishId);
+          setIsFavorite(true);
+          toast.success('Added to favorites');
+        }
       } else {
-        await api.addFavorite(userId, dishId);
-        setIsFavorite(true);
-        toast.success('Added to favorites');
+        // Logged-out: use localStorage
+        if (isFavorite) {
+          removeLocalFavorite(dishId);
+          setIsFavorite(false);
+          toast.success('Removed from favorites');
+        } else {
+          addLocalFavorite(dishId);
+          setIsFavorite(true);
+          toast.success('Added to favorites');
+        }
       }
     } catch (error: any) {
       toast.error(error?.message || 'Failed to update favorite');
@@ -224,22 +245,20 @@ export default function DishDetail() {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-4">
                   <CardTitle className="text-3xl">{dish.name}</CardTitle>
-                  {userId && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={handleFavorite}
-                      className="shrink-0"
-                      title={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                    >
-                      <Heart
-                        className={cn(
-                          'h-6 w-6',
-                          isFavorite && 'fill-destructive text-destructive'
-                        )}
-                      />
-                    </Button>
-                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={handleFavorite}
+                    className="shrink-0"
+                    title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Heart
+                      className={cn(
+                        'h-6 w-6',
+                        isFavorite && 'fill-destructive text-destructive'
+                      )}
+                    />
+                  </Button>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary">{dish.category}</Badge>

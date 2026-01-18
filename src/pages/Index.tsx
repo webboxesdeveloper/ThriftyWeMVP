@@ -30,6 +30,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FeedbackDialog } from '@/components/FeedbackDialog';
+import { getLocalFavorites, addLocalFavorite, removeLocalFavorite, isLocalFavorite } from '@/utils/favorites';
 
 export default function Index() {
   const { userId, loading: authLoading, updatePLZ, signOut, userProfile } = useAuth();
@@ -163,17 +164,14 @@ export default function Index() {
     loadFilterOptions();
   }, [userPLZ]);
 
-  // Load favorites only when logged in
+  // Load favorites (from database if logged in, from localStorage if not)
   useEffect(() => {
     if (userId) {
       loadFavorites();
     } else {
-      setFavoriteDishIds([]);
-      // Reset to 'all' view if not logged in and viewing favorites
-      if (viewMode === 'favorites') {
-        setViewMode('all');
-        updateURLParams({ view: 'all' });
-      }
+      // Load favorites from localStorage for logged-out users
+      const localFavorites = getLocalFavorites();
+      setFavoriteDishIds(localFavorites);
     }
   }, [userId]);
 
@@ -308,13 +306,6 @@ export default function Index() {
   };
 
   const loadDishes = async () => {
-    // Don't load favorites view if not logged in
-    if (viewMode === 'favorites' && !userId) {
-      setViewMode('all');
-      updateURLParams({ view: 'all' });
-      return;
-    }
-
     setLoading(true);
     try {
       const filters: DishFilters = {
@@ -328,22 +319,24 @@ export default function Index() {
 
       let dishesData = await api.getDishes(filters, 10000); 
 
-      // Only load favorites if logged in
+      // Load favorites (from database if logged in, from localStorage if not)
       let favorites: string[] = [];
       if (userId) {
         favorites = await api.getFavorites(userId);
         setFavoriteDishIds(favorites);
       } else {
-        setFavoriteDishIds([]);
+        favorites = getLocalFavorites();
+        setFavoriteDishIds(favorites);
       }
 
-      if (viewMode === 'favorites' && userId) {
+      // Filter by favorites view if enabled (works for both logged-in and logged-out users)
+      if (viewMode === 'favorites') {
         dishesData = dishesData.filter((dish) => favorites.includes(dish.dish_id));
       }
 
       const dishesWithFavorites: Dish[] = dishesData.map((dish) => ({
         ...dish,
-        isFavorite: userId ? favorites.includes(dish.dish_id) : false,
+        isFavorite: favorites.includes(dish.dish_id),
       }));
 
       const sortedDishes = sortDishes(dishesWithFavorites, sortBy, sortDirection);
@@ -421,37 +414,51 @@ export default function Index() {
   };
 
   const handleFavorite = async (dishId: string) => {
-    if (!userId) return;
-
     try {
-      const isFavorite = await api.isFavorite(userId, dishId);
-      if (isFavorite) {
-        await api.removeFavorite(userId, dishId);
-        toast.success('Removed from favorites');
+      if (userId) {
+        // Logged-in: use database
+        const isCurrentlyFavorite = await api.isFavorite(userId, dishId);
+        if (isCurrentlyFavorite) {
+          await api.removeFavorite(userId, dishId);
+          toast.success('Removed from favorites');
+        } else {
+          await api.addFavorite(userId, dishId);
+          toast.success('Added to favorites');
+        }
+        
+        await loadFavorites();
       } else {
-        await api.addFavorite(userId, dishId);
-        toast.success('Added to favorites');
+        // Logged-out: use localStorage
+        const isCurrentlyFavorite = isLocalFavorite(dishId);
+        if (isCurrentlyFavorite) {
+          removeLocalFavorite(dishId);
+          toast.success('Removed from favorites');
+        } else {
+          addLocalFavorite(dishId);
+          toast.success('Added to favorites');
+        }
+        
+        // Update state from localStorage
+        const updatedFavorites = getLocalFavorites();
+        setFavoriteDishIds(updatedFavorites);
       }
       
-      await loadFavorites();
-      
-      setDishes((prevDishes) =>
-        prevDishes.map((dish) =>
+      // Update dishes state
+      setDishes((prevDishes) => {
+        const isCurrentlyFavorite = userId 
+          ? favoriteDishIds.includes(dishId)
+          : isLocalFavorite(dishId);
+        
+        return prevDishes.map((dish) =>
           dish.dish_id === dishId
-            ? { ...dish, isFavorite: !isFavorite }
+            ? { ...dish, isFavorite: !isCurrentlyFavorite }
             : dish
-        )
-      );
-      
-      setFavoriteDishIds((prev) => {
-        if (isFavorite) {
-          return prev.filter((id) => id !== dishId);
-        } else {
-          return [...prev, dishId];
-        }
+        );
       });
       
+      // Reload dishes to refresh the list (especially if in favorites view)
       loadDishes().catch((error) => {
+        console.error('Error reloading dishes:', error);
       });
     } catch (error: any) {
       toast.error(error?.message || 'Failed to update favorite. Please try again.');
@@ -703,10 +710,6 @@ export default function Index() {
 
           <main className="lg:col-span-3">
             <Tabs value={viewMode} onValueChange={(value) => {
-              if (value === 'favorites' && !userId) {
-                toast.info('Please login to view your favorites');
-                return;
-              }
               handleViewModeChange(value as 'all' | 'favorites');
             }} className="w-full">
               {/* Pagination at top - sticky (both mobile and desktop) */}
@@ -721,17 +724,15 @@ export default function Index() {
                       <ShoppingCart className="h-4 w-4" />
                       Available Meals
                     </TabsTrigger>
-                    {userId && (
-                      <TabsTrigger value="favorites" className="flex items-center gap-2">
-                        <Heart className="h-4 w-4" />
-                        Favorites
-                        {favoriteDishIds.length > 0 && (
-                          <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
-                            {favoriteDishIds.length}
-                          </span>
-                        )}
-                      </TabsTrigger>
-                    )}
+                    <TabsTrigger value="favorites" className="flex items-center gap-2">
+                      <Heart className="h-4 w-4" />
+                      Favorites
+                      {favoriteDishIds.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
+                          {favoriteDishIds.length}
+                        </span>
+                      )}
+                    </TabsTrigger>
                   </TabsList>
                   <p className="text-muted-foreground">
                     {viewMode === 'favorites' 
@@ -768,7 +769,7 @@ export default function Index() {
                     <DishCard 
                       key={dish.dish_id} 
                       dish={dish} 
-                      onFavorite={userId ? handleFavorite : undefined} 
+                      onFavorite={handleFavorite} 
                     />
                   ))}
                 </div>
@@ -798,7 +799,7 @@ export default function Index() {
                     <DishCard 
                       key={dish.dish_id} 
                       dish={dish} 
-                      onFavorite={userId ? handleFavorite : undefined} 
+                      onFavorite={handleFavorite} 
                     />
                   ))}
                 </div>
