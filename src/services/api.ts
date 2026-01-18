@@ -851,6 +851,24 @@ class ApiService {
       throw new Error(error.message || 'CSV import failed');
     }
   }
+
+  async submitFeedback(feedback: string, userId?: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('events')
+        .insert({
+          user_id: userId || null,
+          event_type: 'feedback',
+          event_data: {
+            feedback: feedback.trim(),
+          },
+        });
+
+      if (error) throw error;
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to submit feedback');
+    }
+  }
 }
 
 export const api = new ApiService();

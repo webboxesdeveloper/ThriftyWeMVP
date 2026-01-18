@@ -4,6 +4,7 @@ import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { Button } from '@/components/ui/button';
 import { CSVImport } from '@/components/admin/CSVImport';
 import { DataTable } from '@/components/admin/DataTable';
+import { FeedbackView } from '@/components/admin/FeedbackView';
 import { LogOut, Database } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -53,6 +54,7 @@ export default function AdminDashboard() {
           <TabsList>
             <TabsTrigger value="import">Import Data</TabsTrigger>
             <TabsTrigger value="view">View Data</TabsTrigger>
+            <TabsTrigger value="feedback">Feedback</TabsTrigger>
           </TabsList>
 
           <TabsContent value="import" className="space-y-4">
@@ -61,6 +63,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="view" className="space-y-4">
             <DataTable />
+          </TabsContent>
+
+          <TabsContent value="feedback" className="space-y-4">
+            <FeedbackView />
           </TabsContent>
         </Tabs>
       </main>

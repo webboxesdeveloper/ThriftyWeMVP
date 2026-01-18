@@ -230,6 +230,18 @@ CREATE POLICY "Users can insert own events"
   FOR INSERT
   WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
 
+-- Policy: Admins can read all events (for feedback viewing)
+CREATE POLICY "Admins can read all events"
+  ON events
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM user_roles
+      WHERE user_roles.user_id = auth.uid()
+      AND user_roles.role = 'admin'
+    )
+  );
+
 -- ============================================================================
 -- SERVICE ROLE POLICIES (For CSV import via Edge Functions)
 -- ============================================================================

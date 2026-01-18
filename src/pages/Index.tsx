@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { FeedbackDialog } from '@/components/FeedbackDialog';
 
 export default function Index() {
   const { userId, loading: authLoading, updatePLZ, signOut, userProfile } = useAuth();
@@ -808,6 +809,7 @@ export default function Index() {
       <footer className="border-t mt-16 py-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           <p className="mb-2">© 2025 MealDeal. Alle Rechte vorbehalten.</p>
+          <p className="mb-2 italic">Das ist eine offene Beta. Preise, Datenabdeckung und Funktionen können sich ändern. Die Berechnungen sind korrekt, aber nicht vollständig.</p>
           <div className="flex justify-center gap-4">
             <Link 
               to={{
@@ -827,6 +829,18 @@ export default function Index() {
             >
               Nutzungsbedingungen
             </Link>
+            <Link 
+              to={{
+                pathname: "/faq",
+                state: { returnSearch: searchParams.toString() }
+              }}
+              className="hover:text-primary underline"
+            >
+              FAQ
+            </Link>
+          </div>
+          <div className="mt-4 flex justify-center">
+            <FeedbackDialog userId={userId} />
           </div>
         </div>
       </footer>
