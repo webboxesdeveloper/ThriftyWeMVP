@@ -208,7 +208,7 @@ export default function Index() {
           });
           scrollRestoredRef.current = true;
           // Don't remove from sessionStorage yet - keep it for potential future navigations
-        }, 50);
+        }, 100);
       } else {
         scrollRestoredRef.current = true; // Mark as restored even if no position saved
       }
@@ -219,9 +219,17 @@ export default function Index() {
   }, [loading, dishes.length, location.state, location.pathname]);
 
   // Save scroll position while scrolling (for when user navigates away)
+  // IMPORTANT: Only save scroll position when on Index page AND after restoration is complete
+  // This prevents overwriting the saved position during restoration
   useEffect(() => {
+    // Only set up scroll saving when on Index page
+    if (location.pathname !== '/') {
+      return;
+    }
+
     const handleScroll = () => {
-      if (location.pathname === '/') {
+      // Only save if restoration is complete (prevents overwriting during restoration)
+      if (scrollRestoredRef.current) {
         sessionStorage.setItem('scrollPosition', window.scrollY.toString());
       }
     };
@@ -238,12 +246,25 @@ export default function Index() {
       }
     };
 
-    window.addEventListener('scroll', throttledScroll, { passive: true });
+    // Only start saving scroll after a brief delay to allow restoration to complete first
+    // If not returning from detail, we can start saving immediately
+    const isReturningFromDetail = location.state?.fromDetail === true;
+    const startDelay = isReturningFromDetail ? 250 : 0;
+
+    const timeoutId = setTimeout(() => {
+      // If not returning from detail, mark as "restored" (no restoration needed) so we can start saving
+      if (!isReturningFromDetail) {
+        scrollRestoredRef.current = true;
+      }
+      // Now that restoration should be complete (or not needed), start saving scroll
+      window.addEventListener('scroll', throttledScroll, { passive: true });
+    }, startDelay);
 
     return () => {
+      clearTimeout(timeoutId);
       window.removeEventListener('scroll', throttledScroll);
     };
-  }, [location.pathname]);
+  }, [location.pathname, location.state]);
 
   const loadUserData = async () => {
     if (!userId) return;
