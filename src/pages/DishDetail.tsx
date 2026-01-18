@@ -15,12 +15,14 @@ import {
   Euro,
   AlertCircle,
   CheckCircle2,
-  LogIn
+  LogIn,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { getLocalFavorites, addLocalFavorite, removeLocalFavorite, isLocalFavorite } from '@/utils/favorites';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 export default function DishDetail() {
   const { dishId } = useParams<{ dishId: string }>();
@@ -288,9 +290,30 @@ export default function DishDetail() {
             <div className="space-y-4">
               {totalAggregatedSavings > 0 && (
                 <div className="flex items-center gap-2">
-                  <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white text-lg px-4 py-2">
-                    <CheckCircle2 className="h-5 w-5 mr-2" />
-                    Total Savings: €{totalAggregatedSavings.toFixed(2)}
+                  <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white text-lg px-4 py-2 flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span>Total Savings: €{totalAggregatedSavings.toFixed(2)}</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 p-0 text-white/90 hover:text-white hover:bg-white/20 rounded-full ml-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Info className="h-3.5 w-3.5" />
+                          <span className="sr-only">Info about savings calculation</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80" align="start">
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm">About Savings Calculation</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Die angezeigten Basispreise sind Einheitspreise (z. B. €/kg, €/l, €/Stück) für reguläre Markenprodukte. Eigenmarken oder Sonderangebote sind nicht berücksichtigt. Tatsächliche Preise können je nach Produkt und Packung variieren.
+                          </p>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </Badge>
                   {pricing && pricing.ingredients_with_offers_count > 0 && (
                     <Badge variant="outline" className="text-sm">
@@ -321,12 +344,6 @@ export default function DishDetail() {
                   to see current offers and savings
                 </p>
               )}
-
-              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mt-4">
-                <p className="text-sm text-blue-900 dark:text-blue-100">
-                  <strong>Hinweis:</strong>: Die angezeigten Basispreise sind Einheitspreise (z. B. €/kg, €/l, €/Stück) für reguläre Markenprodukte. Eigenmarken oder Sonderangebote sind nicht berücksichtigt. Tatsächliche Preise können je nach Produkt und Packung variieren.
-                </p>
-              </div>
             </div>
 
         
