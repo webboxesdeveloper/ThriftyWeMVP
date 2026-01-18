@@ -40,6 +40,11 @@ export default function DishDetail() {
   const [selectedChainName, setSelectedChainName] = useState<string | null>(null);
   const [selectedChainId, setSelectedChainId] = useState<string | null>(null);
 
+  // Always scroll to top when detail page loads
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [dishId]);
+
   useEffect(() => {
     if (dishId) {
       if (userId) {
@@ -145,11 +150,8 @@ export default function DishDetail() {
           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
           <h2 className="text-2xl font-bold">Dish not found</h2>
           <Button onClick={() => {
-            // Preserve scroll position when navigating back
-            const savedScroll = sessionStorage.getItem('scrollPosition');
-            if (!savedScroll) {
-              sessionStorage.setItem('scrollPosition', '0');
-            }
+            // Navigate back - scroll position is already saved in sessionStorage from Index page
+            // Don't modify it here - let Index page handle restoration
             navigate(`/${location.search}`, { state: { fromDetail: true } });
           }}>
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -172,12 +174,8 @@ export default function DishDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" onClick={() => {
-                // Preserve scroll position when navigating back
-                const savedScroll = sessionStorage.getItem('scrollPosition');
-                if (!savedScroll) {
-                  // If no saved position, save current (shouldn't happen, but just in case)
-                  sessionStorage.setItem('scrollPosition', '0');
-                }
+                // Navigate back - scroll position is already saved in sessionStorage from Index page
+                // Don't modify it here - let Index page handle restoration
                 navigate(`/${location.search}`, { state: { fromDetail: true } });
               }}>
                 <ArrowLeft className="h-5 w-5" />

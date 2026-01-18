@@ -192,22 +192,30 @@ export default function Index() {
 
   // Restore scroll position when returning from dish detail
   useEffect(() => {
-    // Only restore if we have a saved scroll position and data is loaded
-    if (!loading && dishes.length > 0) {
+    // Only restore if we're on the Index page and returning from detail page
+    const isReturningFromDetail = location.state?.fromDetail === true;
+    
+    if (isReturningFromDetail && !loading && dishes.length > 0 && !scrollRestoredRef.current) {
       const savedScrollPosition = sessionStorage.getItem('scrollPosition');
-      if (savedScrollPosition && !scrollRestoredRef.current) {
-        // Use requestAnimationFrame to ensure DOM is fully rendered
-        requestAnimationFrame(() => {
+      if (savedScrollPosition) {
+        // Use setTimeout with a small delay to ensure DOM is fully rendered
+        setTimeout(() => {
+          const scrollY = parseInt(savedScrollPosition, 10);
           window.scrollTo({
-            top: parseInt(savedScrollPosition, 10),
+            top: scrollY,
             behavior: 'auto' // Instant scroll, not smooth
           });
-          sessionStorage.removeItem('scrollPosition');
           scrollRestoredRef.current = true;
-        });
+          // Don't remove from sessionStorage yet - keep it for potential future navigations
+        }, 50);
+      } else {
+        scrollRestoredRef.current = true; // Mark as restored even if no position saved
       }
+    } else if (!isReturningFromDetail) {
+      // Reset the ref when not returning from detail (e.g., direct navigation to Index)
+      scrollRestoredRef.current = false;
     }
-  }, [loading, dishes.length]);
+  }, [loading, dishes.length, location.state, location.pathname]);
 
   // Save scroll position while scrolling (for when user navigates away)
   useEffect(() => {
