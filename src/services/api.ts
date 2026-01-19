@@ -869,6 +869,114 @@ class ApiService {
       throw new Error(error?.message || 'Failed to submit feedback');
     }
   }
+
+  // Subscription management
+  async getSubscriptionStatus(userId: string): Promise<{
+    status: 'free' | 'premium' | 'cancelled' | 'expired';
+    premium_until: string | null;
+    subscription_started_at: string | null;
+    subscription_cancelled_at: string | null;
+    subscription_duration_days: number;
+    isActive: boolean;
+  } | null> {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('subscription_status, premium_until, subscription_started_at, subscription_cancelled_at, subscription_duration_days')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      const premiumUntil = data.premium_until ? new Date(data.premium_until) : null;
+      const isActive = data.subscription_status === 'premium' && 
+        (premiumUntil === null || premiumUntil > new Date());
+
+      return {
+        status: data.subscription_status as 'free' | 'premium' | 'cancelled' | 'expired',
+        premium_until: data.premium_until,
+        subscription_started_at: data.subscription_started_at,
+        subscription_cancelled_at: data.subscription_cancelled_at,
+        subscription_duration_days: data.subscription_duration_days || 30,
+        isActive,
+      };
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to get subscription status');
+    }
+  }
+
+  async checkPremiumAccess(userId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase.rpc('has_premium_access', {
+        p_user_id: userId,
+      });
+
+      if (error) throw error;
+      return data === true;
+    } catch (error: any) {
+      console.error('Error checking premium access:', error);
+      return false;
+    }
+  }
+
+  async activatePremium(
+    userId: string,
+    durationDays: number = 30,
+    paymentId?: string,
+    paymentMethod?: string,
+    amountPaid?: number
+  ): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('activate_premium_subscription', {
+        p_user_id: userId,
+        p_duration_days: durationDays,
+        p_payment_id: paymentId || null,
+        p_payment_method: paymentMethod || null,
+        p_amount_paid: amountPaid || null,
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to activate premium subscription');
+    }
+  }
+
+  async cancelPremium(userId: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('cancel_premium_subscription', {
+        p_user_id: userId,
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to cancel subscription');
+    }
+  }
+
+  async getSubscriptionHistory(userId: string): Promise<Array<{
+    subscription_id: string;
+    status: string;
+    started_at: string;
+    expires_at: string;
+    cancelled_at: string | null;
+    duration_days: number;
+    payment_method: string | null;
+    amount_paid: number | null;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('subscription_id, status, started_at, expires_at, cancelled_at, duration_days, payment_method, amount_paid')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to get subscription history');
+    }
+  }
 }
 
 export const api = new ApiService();

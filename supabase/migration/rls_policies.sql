@@ -48,7 +48,7 @@ CREATE POLICY "Users can insert own user role"
   FOR INSERT
   WITH CHECK (
     auth.uid() = user_id AND 
-    role = 'user'
+    role IN ('free', 'premium')
   );
 
 -- Favorites

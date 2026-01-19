@@ -16,7 +16,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { ShoppingCart, Sparkles, LogOut, ArrowUpDown, Heart, User, ChevronDown, LogIn } from 'lucide-react';
+import { ShoppingCart, Sparkles, LogOut, ArrowUpDown, Heart, User, ChevronDown, LogIn, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -33,7 +33,7 @@ import { FeedbackDialog } from '@/components/FeedbackDialog';
 import { getLocalFavorites, addLocalFavorite, removeLocalFavorite, isLocalFavorite } from '@/utils/favorites';
 
 export default function Index() {
-  const { userId, loading: authLoading, updatePLZ, signOut, userProfile } = useAuth();
+  const { userId, loading: authLoading, updatePLZ, signOut, userProfile, isPremium } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -613,15 +613,22 @@ export default function Index() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {userProfile?.username 
-                            ? userProfile.username.charAt(0).toUpperCase()
-                            : userProfile?.email 
-                            ? userProfile.email.charAt(0).toUpperCase()
-                            : 'U'}
-                        </AvatarFallback>
-                      </Avatar>
+                      <div className="relative">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {userProfile?.username 
+                              ? userProfile.username.charAt(0).toUpperCase()
+                              : userProfile?.email 
+                              ? userProfile.email.charAt(0).toUpperCase()
+                              : 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        {isPremium && (
+                          <div className="absolute -top-1 -right-1 bg-primary rounded-full p-0.5">
+                            <Crown className="h-3 w-3 text-primary-foreground" />
+                          </div>
+                        )}
+                      </div>
                       <div className="hidden md:flex flex-col items-start">
                         <span className="text-sm font-medium">
                           {userProfile?.username || userProfile?.email || 'User'}
@@ -646,6 +653,24 @@ export default function Index() {
                         )}
                       </div>
                     </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {isPremium ? (
+                      <DropdownMenuItem 
+                        onClick={() => navigate('/premium/status')} 
+                        className="cursor-pointer"
+                      >
+                        <Crown className="mr-2 h-4 w-4 text-primary" />
+                        <span>Premium Status</span>
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem 
+                        onClick={() => navigate('/premium/checkout')} 
+                        className="cursor-pointer"
+                      >
+                        <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                        <span>Upgrade to Premium</span>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
                       <LogOut className="mr-2 h-4 w-4" />

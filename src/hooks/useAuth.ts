@@ -5,6 +5,9 @@ export const useAuth = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
+  const [premiumUntil, setPremiumUntil] = useState<Date | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<'free' | 'premium' | 'cancelled' | 'expired'>('free');
   const [userProfile, setUserProfile] = useState<{ username?: string; email?: string } | null>(null);
   const currentAuthUserIdRef = useRef<string | null>(null);
   const hasSyncedRef = useRef(false);
@@ -30,9 +33,12 @@ export const useAuth = () => {
             if (!user || userError) {
               await supabase.auth.signOut();
               if (isMounted) {
-                setUserId(null);
-                setRole(null);
-                setUserProfile(null);
+              setUserId(null);
+              setRole(null);
+              setIsPremium(false);
+              setPremiumUntil(null);
+              setSubscriptionStatus('free');
+              setUserProfile(null);
               }
               return;
             }
@@ -57,9 +63,12 @@ export const useAuth = () => {
             }
           }
         } else if (isMounted) {
-          setUserId(null);
-          setRole(null);
-          setUserProfile(null);
+              setUserId(null);
+              setRole(null);
+              setIsPremium(false);
+              setPremiumUntil(null);
+              setSubscriptionStatus('free');
+              setUserProfile(null);
         }
 
         initialSessionLoaded = true;
@@ -106,9 +115,12 @@ export const useAuth = () => {
               currentAuthUserIdRef.current = null;
               hasSyncedRef.current = false;
               if (isMounted) {
-                setUserId(null);
-                setRole(null);
-                setUserProfile(null);
+              setUserId(null);
+              setRole(null);
+              setIsPremium(false);
+              setPremiumUntil(null);
+              setSubscriptionStatus('free');
+              setUserProfile(null);
                 setLoading(false);
               }
             }
@@ -125,15 +137,21 @@ export const useAuth = () => {
               email: errorSession.user.email || undefined,
             });
           } else if (isMounted) {
-            setUserId(null);
-            setRole(null);
-            setUserProfile(null);
+              setUserId(null);
+              setRole(null);
+              setIsPremium(false);
+              setPremiumUntil(null);
+              setSubscriptionStatus('free');
+              setUserProfile(null);
           }
         } catch (sessionError) {
           if (isMounted) {
-            setUserId(null);
-            setRole(null);
-            setUserProfile(null);
+              setUserId(null);
+              setRole(null);
+              setIsPremium(false);
+              setPremiumUntil(null);
+              setSubscriptionStatus('free');
+              setUserProfile(null);
           }
         }
         initialSessionLoaded = true;
@@ -159,7 +177,7 @@ export const useAuth = () => {
     try {
       const { data: profile, error: selErr } = await supabase
         .from('user_profiles')
-        .select('id, plz, username, email')
+        .select('id, plz, username, email, subscription_status, premium_until')
         .eq('id', authUserId)
         .single();
 
@@ -192,6 +210,22 @@ export const useAuth = () => {
           username: profile.username || undefined,
           email: profile.email || undefined,
         });
+
+        // Update subscription status
+        const status = (profile.subscription_status || 'free') as 'free' | 'premium' | 'cancelled' | 'expired';
+        setSubscriptionStatus(status);
+        
+        // Check premium access (considering expiration)
+        if (profile.premium_until) {
+          const expiresAt = new Date(profile.premium_until);
+          const now = new Date();
+          const isActive = status === 'premium' && expiresAt > now;
+          setIsPremium(isActive);
+          setPremiumUntil(isActive ? expiresAt : null);
+        } else {
+          setIsPremium(status === 'premium');
+          setPremiumUntil(null);
+        }
       }
 
       const { data: roles, error: rolesError } = await supabase
@@ -200,18 +234,27 @@ export const useAuth = () => {
         .eq('user_id', authUserId);
 
       if (rolesError) {
-        setRole('user');
+        setRole('free');
         return;
       }
 
       if (roles && roles.length > 0) {
         const hasAdmin = roles.find((r: any) => r.role === 'admin');
-        setRole(hasAdmin ? 'admin' : roles[0].role);
+        const hasPremium = roles.find((r: any) => r.role === 'premium');
+        
+        // Priority: admin > premium > free
+        if (hasAdmin) {
+          setRole('admin');
+        } else if (hasPremium && isPremium) {
+          setRole('premium');
+        } else {
+          setRole(roles.find((r: any) => r.role === 'free')?.role || 'free');
+        }
       } else {
-        const { error: insertRoleError } = await supabase.from('user_roles').insert({ user_id: authUserId, role: 'user' });
+        const { error: insertRoleError } = await supabase.from('user_roles').insert({ user_id: authUserId, role: 'free' });
         if (insertRoleError) {
         }
-        setRole('user');
+        setRole('free');
       }
     } catch (error) {
       throw error;
@@ -292,9 +335,12 @@ export const useAuth = () => {
       } catch {
       }
     } finally {
-      setUserId(null);
-      setRole(null);
-      setUserProfile(null);
+              setUserId(null);
+              setRole(null);
+              setIsPremium(false);
+              setPremiumUntil(null);
+              setSubscriptionStatus('free');
+              setUserProfile(null);
     }
   };
 
@@ -307,7 +353,19 @@ export const useAuth = () => {
     if (error) throw error;
   };
 
-  return { userId, loading, role, userProfile, signIn, signUp, signOut, updatePLZ } as const;
+  return { 
+    userId, 
+    loading, 
+    role, 
+    isPremium,
+    premiumUntil,
+    subscriptionStatus,
+    userProfile, 
+    signIn, 
+    signUp, 
+    signOut, 
+    updatePLZ 
+  } as const;
 };
 
 export default useAuth;

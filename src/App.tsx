@@ -13,6 +13,8 @@ import RequireAuth from "./components/RequireAuth";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import FAQ from "./pages/FAQ";
+import PremiumStatus from "./pages/PremiumStatus";
+import PremiumCheckout from "./pages/PremiumCheckout";
 import { PrivacyBanner } from "@/components/PrivacyBanner";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,8 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/premium/status" element={<RequireAuth><PremiumStatus /></RequireAuth>} />
+            <Route path="/premium/checkout" element={<RequireAuth><PremiumCheckout /></RequireAuth>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <PrivacyBanner />
