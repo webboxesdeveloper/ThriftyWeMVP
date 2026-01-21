@@ -118,6 +118,7 @@ BEGIN
     subscription_status = 'premium',
     premium_until = v_expires_at,
     subscription_started_at = COALESCE(subscription_started_at, NOW()),
+    subscription_cancelled_at = NULL, -- Clear cancelled_at when activating new subscription
     subscription_duration_days = p_duration_days,
     updated_at = NOW()
   WHERE id = p_user_id;

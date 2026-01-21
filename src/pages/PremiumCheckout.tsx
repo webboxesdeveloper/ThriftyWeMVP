@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -43,51 +43,95 @@ const PRICING_PLANS = [
 ];
 
 export default function PremiumCheckout() {
-  const { userId } = useAuth();
+  const { userId, role, isPremium, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [selectedPlan, setSelectedPlan] = useState<string>('90days');
   const [processing, setProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
 
+  // Reset processing state when component mounts (handles browser back navigation)
+  useEffect(() => {
+    setProcessing(false);
+    // Handle canceled checkout
+    if (searchParams.get('canceled') === 'true') {
+      toast.info('Checkout was canceled. You can try again with a different plan.');
+      // Clean up URL without the canceled param
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('canceled');
+      const newUrl = newParams.toString() ? `/premium/checkout?${newParams.toString()}` : '/premium/checkout';
+      navigate(newUrl, { replace: true });
+    }
+  }, [searchParams, navigate]);
+
+  // Redirect if already premium
+  useEffect(() => {
+    if (role === 'premium' || role === 'admin' || isPremium) {
+      navigate('/premium/status');
+    }
+  }, [role, isPremium, navigate]);
+
+  // Wait for auth to finish loading before checking userId
+  // This prevents redirect to login while auth is still checking
+  useEffect(() => {
+    if (!loading && !userId) {
+      navigate('/login');
+    }
+  }, [loading, userId, navigate]);
+
+  // Show loading state while auth is checking
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Redirect if no userId after loading completes
   if (!userId) {
-    navigate('/login');
     return null;
   }
 
   const handleCheckout = async () => {
     if (!userId) return;
+    if (processing) return; // Prevent multiple simultaneous requests
 
     const plan = PRICING_PLANS.find(p => p.id === selectedPlan);
     if (!plan) return;
 
     setProcessing(true);
     try {
-      // In a real implementation, this would:
-      // 1. Create a payment session with Stripe/PayPal
-      // 2. Redirect to payment provider
-      // 3. On successful payment, activate premium via webhook
+      // Create Stripe checkout session
+      toast.info('Creating checkout session...');
       
-      // For now, we'll simulate payment and activate directly
-      // TODO: Replace with actual payment integration
-      toast.info('Processing payment...');
-      
-      // Simulate payment processing delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Activate premium subscription
-      await api.activatePremium(
-        userId,
-        plan.durationDays,
-        `payment_${Date.now()}`, // Mock payment ID
-        paymentMethod,
-        plan.price
-      );
-      
-      toast.success('Premium activated successfully!');
-      navigate('/premium/status');
+      // Call the edge function to create Stripe Checkout session
+      const response = await api.createStripeCheckout({
+        planId: plan.id,
+        durationDays: plan.durationDays,
+        amount: plan.price,
+      });
+
+      if (!response) {
+        throw new Error('No response from server');
+      }
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      if (response.checkoutUrl) {
+        // Redirect to Stripe Checkout
+        toast.info('Redirecting to secure payment...');
+        // Use setTimeout to ensure state updates are processed
+        setTimeout(() => {
+          window.location.href = response.checkoutUrl!;
+        }, 100);
+      } else {
+        throw new Error('No checkout URL returned from server. Please try again.');
+      }
     } catch (error: any) {
+      console.error('Checkout error:', error);
       toast.error(error?.message || 'Payment failed. Please try again.');
-    } finally {
       setProcessing(false);
     }
   };
@@ -192,52 +236,26 @@ export default function PremiumCheckout() {
               })}
             </div>
 
-            {/* Payment Method Selection */}
+            {/* Payment Method Info */}
             <Card className="border-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" />
                   Payment Method
                 </CardTitle>
-                <CardDescription>Choose how you'd like to pay securely</CardDescription>
+                <CardDescription>Secure payment via Stripe</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button
-                  variant={paymentMethod === 'stripe' ? 'default' : 'outline'}
-                  className={`w-full justify-between h-auto py-4 ${paymentMethod === 'stripe' ? 'ring-2 ring-primary' : ''}`}
-                  onClick={() => setPaymentMethod('stripe')}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-background">
-                      <CreditCard className="h-5 w-5" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-semibold">Credit/Debit Card</div>
-                      <div className="text-xs text-muted-foreground">Visa, Mastercard, Amex</div>
-                    </div>
+                <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
+                  <div className="p-2 rounded-lg bg-background">
+                    <CreditCard className="h-5 w-5" />
                   </div>
-                  {paymentMethod === 'stripe' && (
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                  )}
-                </Button>
-                <Button
-                  variant={paymentMethod === 'paypal' ? 'default' : 'outline'}
-                  className={`w-full justify-between h-auto py-4 ${paymentMethod === 'paypal' ? 'ring-2 ring-primary' : ''}`}
-                  onClick={() => setPaymentMethod('paypal')}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-background">
-                      <CreditCard className="h-5 w-5" />
-                    </div>
-                    <div className="text-left">
-                      <div className="font-semibold">PayPal</div>
-                      <div className="text-xs text-muted-foreground">Pay with your PayPal account</div>
-                    </div>
+                  <div className="flex-1">
+                    <div className="font-semibold">Credit/Debit Card</div>
+                    <div className="text-xs text-muted-foreground">Visa, Mastercard, Amex</div>
                   </div>
-                  {paymentMethod === 'paypal' && (
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                  )}
-                </Button>
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                </div>
                 <p className="text-xs text-muted-foreground pt-2 border-t">
                   🔒 All payments are secure and encrypted. We never store your payment details.
                 </p>

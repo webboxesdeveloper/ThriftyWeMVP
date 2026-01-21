@@ -16,117 +16,243 @@ export const useAuth = () => {
     let isMounted = true;
     let subscription: { unsubscribe: () => void } | null = null;
     let initialSessionLoaded = false;
+    let initStarted = false;
 
     const init = async () => {
+      // Prevent multiple simultaneous initializations
+      if (initStarted) return;
+      initStarted = true;
+
       const timeoutId = setTimeout(() => {
         if (isMounted) {
           setLoading(false);
         }
-      }, 10000);
+      }, 5000); // Reduced timeout from 10s to 5s
 
       try {
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
         
         if (currentSession) {
+          // Use the session user directly if available, instead of calling getUser()
+          // This avoids unnecessary API calls that might fail on redirects
+          if (currentSession.user) {
+            // Session is valid and has user, proceed
+            if (isMounted) {
+              currentAuthUserIdRef.current = currentSession.user.id;
+              try {
+                await syncProfileAndRole(currentSession.user.id);
+                hasSyncedRef.current = true;
+              } catch (syncError) {
+                // Sync failed but session is valid, still set user
+                if (isMounted) {
+                  setUserId(currentSession.user.id);
+                  setRole('free');
+                  setUserProfile({
+                    email: currentSession.user.email || undefined,
+                  });
+                }
+              }
+            }
+            initialSessionLoaded = true;
+            
+            // Set up auth state listener (moved after initial session check)
+            if (!subscription) {
+              const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                if (!isMounted) return;
+
+                // Ignore events before initial session is loaded
+                if (!initialSessionLoaded) {
+                  if (session) {
+                    initialSessionLoaded = true;
+                  } else {
+                    return;
+                  }
+                }
+
+                initialSessionLoaded = true;
+
+                if (session?.user) {
+                  const newUserId = session.user.id;
+                  const userIdChanged = newUserId !== currentAuthUserIdRef.current;
+                  
+                  if (userIdChanged) {
+                    currentAuthUserIdRef.current = newUserId;
+                    hasSyncedRef.current = false;
+                  }
+                  
+                  // Only sync if needed - avoid unnecessary API calls on every navigation
+                  // Don't sync on every TOKEN_REFRESHED to avoid constant re-syncing
+                  const shouldSync = !hasSyncedRef.current || event === 'SIGNED_IN' || userIdChanged;
+                  
+                  if (isMounted && shouldSync) {
+                    try {
+                      await syncProfileAndRole(newUserId);
+                      hasSyncedRef.current = true;
+                    } catch (syncError) {
+                      console.warn('Sync error in auth state change:', syncError);
+                      if (isMounted) {
+                        // Set basic user info even if sync fails
+                        setUserId(newUserId);
+                        setRole('free');
+                        setUserProfile({
+                          email: session.user.email || undefined,
+                        });
+                      }
+                    } finally {
+                      if (isMounted) {
+                        setLoading(false);
+                      }
+                    }
+                  } else if (isMounted) {
+                    // User already synced, just ensure loading is false
+                    setLoading(false);
+                  }
+                } else {
+                  currentAuthUserIdRef.current = null;
+                  hasSyncedRef.current = false;
+                  if (isMounted) {
+                    setUserId(null);
+                    setRole(null);
+                    setIsPremium(false);
+                    setPremiumUntil(null);
+                    setSubscriptionStatus('free');
+                    setUserProfile(null);
+                    setLoading(false);
+                  }
+                }
+              });
+              subscription = authSubscription;
+            }
+            
+            clearTimeout(timeoutId);
+            if (isMounted) {
+              setLoading(false);
+            }
+            return; // Exit early since we have a valid session
+          }
+          
+          // Fallback: if session exists but no user, try getUser() as last resort
           try {
             const { data: { user }, error: userError } = await supabase.auth.getUser();
             if (!user || userError) {
-              await supabase.auth.signOut();
-              if (isMounted) {
-              setUserId(null);
-              setRole(null);
-              setIsPremium(false);
-              setPremiumUntil(null);
-              setSubscriptionStatus('free');
-              setUserProfile(null);
+              // Only sign out if it's a clear authentication error, not network issues
+              const errorMsg = userError?.message?.toLowerCase() || '';
+              if (errorMsg.includes('jwt expired') || errorMsg.includes('invalid token') || errorMsg.includes('session not found')) {
+                // Try refresh first
+                try {
+                  const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+                  if (refreshedSession?.user) {
+                    if (isMounted) {
+                      currentAuthUserIdRef.current = refreshedSession.user.id;
+                      await syncProfileAndRole(refreshedSession.user.id);
+                      hasSyncedRef.current = true;
+                    }
+                    return;
+                  }
+                } catch (refreshError) {
+                  // Refresh failed, but don't sign out - let the session persist
+                  console.warn('Session refresh failed, but keeping session:', refreshError);
+                  if (isMounted && currentSession.user) {
+                    setUserId(currentSession.user.id);
+                    setRole('free');
+                  }
+                  return;
+                }
+              }
+              // For other errors (network, etc.), don't sign out - keep the session
+              console.warn('getUser failed but session exists, keeping session:', userError);
+              if (isMounted && currentSession.user) {
+                setUserId(currentSession.user.id);
+                setRole('free');
               }
               return;
             }
           } catch (userError) {
-          }
-        }
-
-        const session = currentSession;
-
-        if (session?.user && isMounted) {
-          currentAuthUserIdRef.current = session.user.id;
-          try {
-            await syncProfileAndRole(session.user.id);
-            hasSyncedRef.current = true;
-          } catch (syncError) {
-            if (isMounted) {
-              setUserId(session.user.id);
-              setRole('user');
-              setUserProfile({
-                email: session.user.email || undefined,
-              });
+            // Network or temporary error, don't sign out - use session as-is
+            console.warn('Error getting user, but session exists, keeping session:', userError);
+            if (isMounted && currentSession.user) {
+              setUserId(currentSession.user.id);
+              setRole('free');
             }
           }
         } else if (isMounted) {
-              setUserId(null);
-              setRole(null);
-              setIsPremium(false);
-              setPremiumUntil(null);
-              setSubscriptionStatus('free');
-              setUserProfile(null);
+          // No session found
+          setUserId(null);
+          setRole(null);
+          setIsPremium(false);
+          setPremiumUntil(null);
+          setSubscriptionStatus('free');
+          setUserProfile(null);
+          setLoading(false);
         }
 
         initialSessionLoaded = true;
 
-        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (!isMounted) return;
+        // Set up auth state listener (if not already set up in the session check above)
+        if (!subscription) {
+          const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!isMounted) return;
 
-          if (!initialSessionLoaded && !session) {
-            return;
-          }
+            // Ignore initial null session events before we've loaded the initial session
+            if (!initialSessionLoaded && !session) {
+              return;
+            }
 
-          const newAuthUserId = session?.user?.id || null;
-          const authUserIdChanged = newAuthUserId !== currentAuthUserIdRef.current;
-          const needsSync = authUserIdChanged || (newAuthUserId && !hasSyncedRef.current);
+            initialSessionLoaded = true;
+            if (!isMounted) return;
 
-          if (session?.user) {
-            currentAuthUserIdRef.current = session.user.id;
-            
-            if (needsSync) {
-              setLoading(true);
-              try {
-                await syncProfileAndRole(session.user.id);
-                hasSyncedRef.current = true;
-              } catch (error) {
-                if (isMounted) {
-                  setUserId(session.user.id);
-                  setRole('user');
-                  setUserProfile({
-                    email: session.user.email || undefined,
-                  });
+            if (!initialSessionLoaded && !session) {
+              return;
+            }
+
+            const newAuthUserId = session?.user?.id || null;
+            const authUserIdChanged = newAuthUserId !== currentAuthUserIdRef.current;
+            const needsSync = authUserIdChanged || (newAuthUserId && !hasSyncedRef.current);
+
+            if (session?.user) {
+              currentAuthUserIdRef.current = session.user.id;
+              
+              if (needsSync) {
+                setLoading(true);
+                try {
+                  await syncProfileAndRole(session.user.id);
+                  hasSyncedRef.current = true;
+                } catch (error) {
+                  if (isMounted) {
+                    setUserId(session.user.id);
+                    setRole('user');
+                    setUserProfile({
+                      email: session.user.email || undefined,
+                    });
+                  }
+                } finally {
+                  if (isMounted) {
+                    setLoading(false);
+                  }
                 }
-              } finally {
+              } else {
                 if (isMounted) {
                   setLoading(false);
                 }
               }
             } else {
-              if (isMounted) {
-                setLoading(false);
+              if (initialSessionLoaded) {
+                currentAuthUserIdRef.current = null;
+                hasSyncedRef.current = false;
+                if (isMounted) {
+                  setUserId(null);
+                  setRole(null);
+                  setIsPremium(false);
+                  setPremiumUntil(null);
+                  setSubscriptionStatus('free');
+                  setUserProfile(null);
+                  setLoading(false);
+                }
               }
             }
-          } else {
-            if (initialSessionLoaded) {
-              currentAuthUserIdRef.current = null;
-              hasSyncedRef.current = false;
-              if (isMounted) {
-              setUserId(null);
-              setRole(null);
-              setIsPremium(false);
-              setPremiumUntil(null);
-              setSubscriptionStatus('free');
-              setUserProfile(null);
-                setLoading(false);
-              }
-            }
-          }
-        });
-        subscription = authSubscription;
+          });
+          subscription = authSubscription;
+        }
       } catch (error) {
         try {
           const { data: { session: errorSession } } = await supabase.auth.getSession();
@@ -242,10 +368,15 @@ export const useAuth = () => {
         const hasAdmin = roles.find((r: any) => r.role === 'admin');
         const hasPremium = roles.find((r: any) => r.role === 'premium');
         
+        // Get current premium status from profile (not state, as state might not be updated yet)
+        const currentStatus = (profile?.subscription_status || 'free') as 'free' | 'premium' | 'cancelled' | 'expired';
+        const currentPremiumUntil = profile?.premium_until ? new Date(profile.premium_until) : null;
+        const currentIsPremium = currentStatus === 'premium' && (currentPremiumUntil === null || currentPremiumUntil > new Date());
+        
         // Priority: admin > premium > free
         if (hasAdmin) {
           setRole('admin');
-        } else if (hasPremium && isPremium) {
+        } else if (hasPremium && currentIsPremium) {
           setRole('premium');
         } else {
           setRole(roles.find((r: any) => r.role === 'free')?.role || 'free');
@@ -365,7 +496,7 @@ export const useAuth = () => {
     signUp, 
     signOut, 
     updatePLZ 
-  } as const;
+  };
 };
 
 export default useAuth;

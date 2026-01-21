@@ -977,6 +977,55 @@ class ApiService {
       throw new Error(error?.message || 'Failed to get subscription history');
     }
   }
+
+  async createStripeCheckout(params: {
+    planId: string;
+    durationDays: number;
+    amount: number;
+  }): Promise<{ checkoutUrl?: string; sessionId?: string; error?: string }> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: params,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Stripe checkout function error:', error);
+        throw new Error(error.message || 'Function invocation failed');
+      }
+
+      // Handle different response formats
+      if (data === null || data === undefined) {
+        throw new Error('No data returned from checkout function');
+      }
+
+      // If data is a string, try to parse it
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch {
+          throw new Error('Invalid response format from server');
+        }
+      }
+
+      // Check if data is wrapped in another object
+      if (typeof data === 'object' && data.data && typeof data.data === 'object') {
+        return data.data;
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error('createStripeCheckout error:', error);
+      throw new Error(error?.message || 'Failed to create checkout session');
+    }
+  }
 }
 
 export const api = new ApiService();

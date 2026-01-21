@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,9 @@ import { toast } from 'sonner';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function PremiumStatus() {
-  const { userId, isPremium, premiumUntil, subscriptionStatus } = useAuth();
+  const { userId, loading: authLoading, isPremium, premiumUntil, subscriptionStatus, role } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [subscription, setSubscription] = useState<{
     status: 'free' | 'premium' | 'cancelled' | 'expired';
@@ -42,13 +43,36 @@ export default function PremiumStatus() {
   }>>([]);
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking userId
+    if (authLoading) {
+      return;
+    }
+
     if (!userId) {
       navigate('/login');
       return;
     }
 
     loadSubscriptionData();
-  }, [userId, navigate]);
+    
+    // Check for success parameter from checkout
+    if (searchParams.get('success') === 'true') {
+      toast.success('Payment successful! Premium subscription is being activated...');
+      // Clean up URL
+      setSearchParams({});
+      // Reload subscription data multiple times with delays to ensure it's updated
+      // Webhook might take a moment to process
+      setTimeout(() => {
+        loadSubscriptionData();
+      }, 1000);
+      setTimeout(() => {
+        loadSubscriptionData();
+      }, 3000);
+      setTimeout(() => {
+        loadSubscriptionData();
+      }, 5000);
+    }
+  }, [userId, authLoading, navigate, searchParams, setSearchParams]);
 
   const loadSubscriptionData = async () => {
     if (!userId) return;
@@ -61,6 +85,11 @@ export default function PremiumStatus() {
       
       setSubscription(subData);
       setHistory(historyData || []);
+      
+      // Check if premium was just activated
+      if (subData?.isActive && !isPremium) {
+        toast.success('Premium subscription is now active!');
+      }
     } catch (error: any) {
       toast.error(error?.message || 'Failed to load subscription data');
     }
@@ -101,6 +130,20 @@ export default function PremiumStatus() {
   const daysRemaining = premiumUntil 
     ? Math.max(0, Math.ceil((new Date(premiumUntil).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
+
+  // Show loading while auth is being checked
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // If no userId after loading, should redirect to login (handled by useEffect)
+  if (!userId) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
