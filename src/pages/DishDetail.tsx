@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { AdPlaceholder } from '@/components/AdPlaceholder';
 import { getLocalFavorites, addLocalFavorite, removeLocalFavorite, isLocalFavorite } from '@/utils/favorites';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
@@ -226,6 +227,11 @@ export default function DishDetail() {
         </div>
       </header>
 
+      {/* Top Banner Ad */}
+      <div className="container mx-auto px-4 py-4 max-w-4xl">
+        <AdPlaceholder slot="detail-top-banner" format="banner" />
+      </div>
+
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {selectedChainName && (
           <Card className="mb-4 border-primary/20 bg-primary/5">
@@ -358,6 +364,11 @@ export default function DishDetail() {
             )}
           </CardContent>
         </Card>
+
+        {/* Inline Ad between dish info and ingredients */}
+        <div className="my-6">
+          <AdPlaceholder slot="detail-inline" format="rectangle" />
+        </div>
 
         <Card>
           <CardHeader>
@@ -659,6 +670,11 @@ export default function DishDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Bottom Banner Ad */}
+        <div className="mt-8">
+          <AdPlaceholder slot="detail-bottom-banner" format="banner" />
+        </div>
       </div>
     </div>
   );

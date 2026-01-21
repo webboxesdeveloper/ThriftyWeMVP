@@ -30,6 +30,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FeedbackDialog } from '@/components/FeedbackDialog';
+import { AdPlaceholder } from '@/components/AdPlaceholder';
 import { getLocalFavorites, addLocalFavorite, removeLocalFavorite, isLocalFavorite } from '@/utils/favorites';
 
 export default function Index() {
@@ -712,10 +713,15 @@ export default function Index() {
         </div>
       </section>
 
+      {/* Top Banner Ad */}
+      <div className="container mx-auto px-4 py-4">
+        <AdPlaceholder slot="top-banner" format="banner" />
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <aside className="lg:col-span-1">
-            <div className="sticky top-24">
+            <div className="sticky top-24 space-y-6">
               <DishFiltersComponent
                 categories={categories}
                 chains={chains}
@@ -730,6 +736,8 @@ export default function Index() {
                 onQuickMealsChange={handleQuickMealsChange}
                 onMealPrepChange={handleMealPrepChange}
               />
+              {/* Sidebar Ad */}
+              <AdPlaceholder slot="sidebar" format="sidebar" className="hidden lg:block" />
             </div>
           </aside>
 
@@ -789,13 +797,21 @@ export default function Index() {
               </div>
 
               <TabsContent value="all" className="mt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {paginatedDishes.map((dish) => (
-                    <DishCard 
-                      key={dish.dish_id} 
-                      dish={dish} 
-                      onFavorite={handleFavorite} 
-                    />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {paginatedDishes.map((dish, index) => (
+                      <DishCard 
+                        key={dish.dish_id}
+                        dish={dish} 
+                        onFavorite={handleFavorite} 
+                      />
+                    ))}
+                  </div>
+                  {/* Inline Ads - every 6 dishes */}
+                  {Array.from({ length: Math.ceil(paginatedDishes.length / 6) }, (_, i) => i + 1).map((adIndex) => (
+                    <div key={`ad-${adIndex}`} className="mt-4">
+                      <AdPlaceholder slot={`inline-${adIndex}`} format="rectangle" />
+                    </div>
                   ))}
                 </div>
 
@@ -819,13 +835,21 @@ export default function Index() {
               </TabsContent>
 
               <TabsContent value="favorites" className="mt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {paginatedDishes.map((dish) => (
-                    <DishCard 
-                      key={dish.dish_id} 
-                      dish={dish} 
-                      onFavorite={handleFavorite} 
-                    />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {paginatedDishes.map((dish) => (
+                      <DishCard 
+                        key={dish.dish_id}
+                        dish={dish} 
+                        onFavorite={handleFavorite} 
+                      />
+                    ))}
+                  </div>
+                  {/* Inline Ads - every 6 dishes */}
+                  {Array.from({ length: Math.ceil(paginatedDishes.length / 6) }, (_, i) => i + 1).map((adIndex) => (
+                    <div key={`ad-favorites-${adIndex}`} className="mt-4">
+                      <AdPlaceholder slot={`inline-favorites-${adIndex}`} format="rectangle" />
+                    </div>
                   ))}
                 </div>
 
